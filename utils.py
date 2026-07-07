@@ -23,7 +23,7 @@ def dataset_reader(file_path, dataset_name):
         print(f"Ошибка: {str(e)}")
         exit(1)
 
-def view2d(R,Z, data_2d, title):
+def view2d(R,Z, data_2d, title, filename=None):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
     ax1.pcolormesh(R, Z, data_2d[:,:], shading='gouraud')
     ax1.set_aspect('equal')
@@ -32,7 +32,10 @@ def view2d(R,Z, data_2d, title):
     ax2.imshow(data_2d[:,:], interpolation='none')
     ax2.set_aspect('equal')
     ax2.set_title(f"{title} (rho,theta)")
-    fig.savefig('double_disk.png')  
+    if filename:
+        fig.savefig(f"{filename}.png")  
+    else:
+         fig.savefig(f"{title}.png")  
     plt.show()
 
 import matplotlib.pyplot as plt

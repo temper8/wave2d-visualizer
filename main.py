@@ -26,7 +26,7 @@ def main():
     view2d(R, Z, Btot, "Btot")
 
     w0_wpe = dataset_reader(file_path, '/resonance_2D/w0_wpe')
-    view2d(R, Z, w0_wpe, "w0/wpe")
+    view2d(R, Z, w0_wpe, "w0/wpe",  "w0_wpe")
 
 if __name__ == "__main__":
     main()
