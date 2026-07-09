@@ -5,7 +5,7 @@ def main():
 
     run_params = get_attributes_recursive_from(file_path, start_path='/run_params')
     print_dict(run_params)    
-    nphi = run_params['/run_params/w2grid']['nphi1']
+    nphi = run_params['w2grid']['nphi1']
     nphi = f"nphi{nphi}"
     print(nphi)
     #nphi = "nphi-014"

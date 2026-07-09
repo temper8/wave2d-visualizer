@@ -104,7 +104,8 @@ def get_attributes_recursive_from(file_path: str, start_path: str = '/') -> dict
     def visitor(name, obj):
         if obj.attrs:
             # Формируем полный путь к объекту внутри файла
-            full_path = f"{start_path}/{name}".replace('//', '/')
+            #full_path = f"{start_path}/{name}".replace('//', '/')
+            full_path = f"{name}".replace('//', '/')
             all_attributes[full_path] = dict(obj.attrs.items())
 
     try:
