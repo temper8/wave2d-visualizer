@@ -219,3 +219,5 @@ __marimo__/
 *.png
 *.h5
 uv.lock
+*.dat
+*.rar
