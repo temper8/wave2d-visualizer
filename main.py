@@ -6,7 +6,7 @@ def main():
     run_params = get_attributes_recursive_from(file_path, start_path='/run_params')
     print_dict(run_params)    
     nphi = run_params['w2grid']['nphi1']
-    nphi = f"nphi{nphi}"
+    nphi = f"nphi-{abs(nphi):03d}" if nphi < 0 else f"nphi{nphi:03d}"
     print(nphi)
     #nphi = "nphi-014"
     R = dataset_reader(file_path, '/coord/X')
@@ -39,6 +39,9 @@ def main():
 
     Te_2D = dataset_reader(file_path, '/plasma_par_2D/Te')
     view2d(R, Z, Te_2D, "Te")
+
+    Ti_2D = dataset_reader(file_path, '/plasma_par_2D/Ti')
+    view2d(R, Z, Ti_2D, "Ti")
 
     Btot = dataset_reader(file_path, '/magnt_fld_2D/Btot')
     view2d(R, Z, Btot, "Btot")
