@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+from utils import plot_polar_2d
+
 files ={
     "polar_mesh" : 'Elmfire_WagD/polar_mesh_z1.dat',
     'rho_mesh' : 'Elmfire_WagD/rho_mesh_z1.dat',
@@ -20,6 +22,7 @@ print(polar_mesh.dtypes)
 print(f"Размер данных: {polar_mesh.shape}")
 print(f"Количество строк: {polar_mesh.shape[0]}")
 print(f"Количество столбцов: {polar_mesh.shape[1]}")
+step_nrows = polar_mesh.shape[0]
 
 rho_mesh = pd.read_csv(files['rho_mesh'], sep=r'\s+')
 rho_1d = np.array(rho_mesh['rho(cm)'], dtype=np.float32)
@@ -45,7 +48,8 @@ time_values = df_times.loc[time_indices, 'time_value'].values.astype(np.float32)
 
 
 column_names = ['time_index', 'rho', 'theta', 'd_dens']
-df_dens = pd.read_csv(files['data'], sep=r'\s+', header=None, names=column_names, dtype={'time_index': int})
+df_dens = pd.read_csv(files['data'], sep=r'\s+', header=None, names=column_names, 
+                      dtype={'time_index': int}, nrows=step_nrows)
 
 output_h5 = 'z1.h5'
 with h5py.File(output_h5, 'w') as f:
@@ -59,8 +63,20 @@ with h5py.File(output_h5, 'w') as f:
                                     dtype='float32', compression='gzip', chunks=(1, N_rho, N_theta))
     
 
-        
+    theta = np.linspace(0,2*np.pi, N_theta)
     # Заполняем куб пошагово, чтобы не держать в памяти гигантские массивы
     for t_idx, time_val in enumerate(time_indices):
-        step_data = df_dens[df_dens['time_index'] == time_val]['rho'].values
-        ds_fluct[t_idx] = step_data.reshape(N_rho, N_theta)    
+        step_data = df_dens[df_dens['time_index'] == time_val]['d_dens'].values
+        print(step_data)
+        print(step_data.shape)
+        step_2D = np.zeros(shape=(N_rho, N_theta))
+        #step_2D[0,0]= step_data[0]
+        start_index = 0
+        for indx, N_theta in enumerate(N_theta_1d):
+            #print(indx, N_theta)
+            step_2D[indx][0:N_theta]= step_data[start_index:start_index + N_theta]
+            start_index = start_index + N_theta
+        ds_fluct[t_idx] = step_2D
+        print(step_2D[:5, :5])
+        plot_polar_2d(rho_1d, theta, step_2D)
+        break
