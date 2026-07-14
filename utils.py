@@ -138,6 +138,37 @@ def print_dict(d:dict):
         for attr_name, attr_value in attrs.items():
             print(f"  └─ {attr_name}: {attr_value}")
 
+
+
+def plot_polar_2d(r, phi, Z, title="2D Полярный график", cmap="viridis"):
+    """
+    Рисует 2D массив значений в полярных координатах.
+    
+    Параметры:
+    r (1D array): Вектор радиусов (длина N).
+    phi (1D array): Вектор углов в радианах (длина M).
+    Z (2D array): Матрица значений размера (N x M) или (M x N).
+    title (str): Заголовок графика.
+    cmap (str): Цветовая палитра.
+    """
+    fig, ax = plt.subplots(figsize=(8, 8), subplot_kw={'projection': 'polar'})
+    
+    # Создаем 2D сетку координат для корректного отображения
+    R, Phi = np.meshgrid(r, phi)
+    
+    # Если размерность Z не совпадает с сеткой (транспонирована), меняем ее
+    if Z.shape != Phi.shape:
+        Z = Z.T
+        
+    # Сетка углов в pcolormesh должна замыкаться, shading='auto' это учитывает
+    mesh = ax.pcolormesh(Phi, R, Z, cmap=cmap, shading='auto')
+    
+    # Настройка внешнего вида
+    fig.colorbar(mesh, ax=ax, label='Значение')
+    ax.set_title(title, va='bottom', fontsize=14)
+    
+    plt.show()
+
 import matplotlib.pyplot as plt
 # Дальнейшая работа с data_array...
 if __name__ == '__main__':
