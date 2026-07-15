@@ -70,13 +70,14 @@ with h5py.File(output_h5, 'w') as f:
         print(step_data)
         print(step_data.shape)
         step_2D = np.zeros(shape=(N_rho, N_theta))
-        #step_2D[0,0]= step_data[0]
         start_index = 0
-        for indx, N_theta in enumerate(N_theta_1d):
-            #print(indx, N_theta)
-            step_2D[indx][0:N_theta]= step_data[start_index:start_index + N_theta]
-            start_index = start_index + N_theta
+        theta_new = np.linspace(0, 2 * np.pi, N_theta, endpoint=False)
+        for indx, _N_theta in enumerate(N_theta_1d):
+            radial_slice = step_data[start_index : start_index + _N_theta]
+            theta_old = np.linspace(0, 2 * np.pi, _N_theta, endpoint=False)
+            interpolated_slice = np.interp(theta_new, theta_old, radial_slice, period=2*np.pi)
+            step_2D[indx,:] = interpolated_slice
+            start_index = start_index + _N_theta
         ds_fluct[t_idx] = step_2D
-        print(step_2D[:5, :5])
         plot_polar_2d(rho_1d, theta, step_2D)
         break
