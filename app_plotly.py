@@ -58,6 +58,7 @@ t_val = time_values[frame_idx]
 
 st.metric(label="Физическое время симуляции", value=f"{t_val:.4e} с")
 
+print(f"max_tet_points= {max_tet_points}")
 # --- 4. ПЕРЕВОД В ДЕКАРТОВЫ КООРДИНАТЫ ДЛЯ ПРАВИЛЬНОЙ ОТРИСОВКИ ---
 theta_1d = np.linspace(0, 2 * np.pi, max_tet_points)
 T, R = np.meshgrid(theta_1d, rho_1d)
@@ -72,22 +73,21 @@ fig = go.Figure()
 # Задаем параметры цветовой шкалы
 color_axis_args = {'zmin': vmin, 'zmax': vmax} if fix_scale else {}
 
-# Изумительный инструмент go.Contour автоматически скрывает NaN 
-# и сглаживает адаптивную сетку в красивое физическое поле
-fig.add_trace(go.Contour(
-    x=X.flatten(),
-    y=Y.flatten(),
-    z=current_frame.flatten(),
-    connectgaps=False,             # Не зарисовывать физические пустоты
-    colorscale= 'plasma', #cmap_choice,
-    contours_coloring='heatmap',   # Делает заливку гладкой, как тепловая карта
-    line_width=0,                  # Скрывает изолинии для чистоты картинки
+x_coords = X[0, :] # строка углов, пересчитанная в X
+y_coords = Y[:, 0] # столбец радиусов, пересчитанный в Y
+
+fig.add_trace(go.Heatmap(
+    x=X[0, :],         # Используем одномерные срезы сетки
+    y=Y[:, 0],
+    z=current_frame,   # Сама матрица 17x105 с NaN-масками
+    colorscale='plasma', #cmap_choice,
+    hoverinfo='x+y+z',
+    showscale=True,
     colorbar=dict(title='Плотность флуктуаций'),
-    hoverinfo='x+y+z',             # Показывает координаты и значение при наведении
     **color_axis_args
 ))
 
-# Настраиваем внешний вид: убираем оси, сетку и делаем график квадратным
+# Настраиваем внешний вид: убираем оси, делаем график квадратным
 fig.update_layout(
     xaxis=dict(visible=False, scaleanchor="y", scaleratio=1),
     yaxis=dict(visible=False),
@@ -98,6 +98,5 @@ fig.update_layout(
     plot_bgcolor='rgba(0,0,0,0)',
     paper_bgcolor='rgba(0,0,0,0)'
 )
-
 # Выводим в Streamlit (используем True для адаптивности под размер экрана)
 st.plotly_chart(fig,  width='stretch')
