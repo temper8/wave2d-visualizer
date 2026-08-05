@@ -20,7 +20,7 @@ class PlasmaVisualizerApp:
         # 1. Загрузка легких метаданных
         try:
             with h5py.File(H5_FILE, 'r') as f:
-                self.rho_1d = f['rho'][:]
+                self.rho_1d = f['rho_mesh/rho'][:]
                 self.time_values = f['time_values'][:]
                 self.total_frames, _, self.max_tet_points = f['fluctuations'].shape
                 
@@ -28,9 +28,10 @@ class PlasmaVisualizerApp:
                 base_frame = f['fluctuations'][0, :, :]
                 self.vmin = float(np.nanmin(base_frame))
                 self.vmax = float(np.nanmax(base_frame))
+                
         except Exception as e:
             print(f"Ошибка чтения HDF5 файла: {e}")
-            lbl = tk.Label(root, text=f"Ошибка загрузки {H5_FILE}.\nЗапустите сначала конвертер.", fg="red")
+            lbl = tk.Label(root, text=f"Ошибка загрузки {H5_FILE}.", fg="red")
             lbl.pack(pady=20)
             return
 
