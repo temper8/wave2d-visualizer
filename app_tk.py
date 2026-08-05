@@ -11,12 +11,16 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 H5_FILE = 'z1.h5'
 
-class PlasmaVisualizerApp:
+class FluctuationsVisualizerApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Plasma Wave 2D - Tkinter Edition")
+        self.root.title("Fluctuations")
         self.root.geometry("700x750")
-        
+
+        # --- ПЕРЕХВАТ ЗАКРЫТИЯ ОКНА ---
+        # Связываем стандартный «крестик» окна с нашим методом очистки
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+                
         # 1. Загрузка легких метаданных
         try:
             with h5py.File(H5_FILE, 'r') as f:
@@ -79,7 +83,7 @@ class PlasmaVisualizerApp:
         control_frame = tk.Frame(self.root)
         control_frame.pack(fill=tk.X, padx=20, pady=15)
 
-        tk.Label(control_frame, text="Кадр:", font=("Arial", 10)).pack(side=tk.LEFT, padx=5)
+        tk.Label(control_frame, text="Frame:", font=("Arial", 10)).pack(side=tk.LEFT, padx=5)
 
         # Ползунок (Scale)
         self.slider = ttk.Scale(
@@ -116,8 +120,24 @@ class PlasmaVisualizerApp:
         # Обновляем только сам рисунок на холсте (происходит мгновенно)
         self.canvas.draw_idle()
 
+    # --- МЕТОД ПРАВИЛЬНОЙ ОЧИСТКИ ПРИ ЗАКРЫТИИ ОКНА ---
+    def on_closing(self):
+        print("Закрытие приложения и освобождение ресурсов...")
+        
+        # 1. Удаляем виджет холста из памяти окна
+        if hasattr(self, 'canvas_widget'):
+            self.canvas_widget.destroy()
+            
+        # 2. Закрываем саму фигуру Matplotlib, чтобы разгрузить графический бэкенд
+        if hasattr(self, 'fig'):
+            plt.close(self.fig)
+            
+        # 3. Полностью уничтожаем главное окно и останавливаем root.mainloop()
+        self.root.destroy()
+        print("Приложение успешно закрыто.")
+
 # Запуск приложения
 if __name__ == "__main__":
     root = tk.Tk()
-    app = PlasmaVisualizerApp(root)
+    app = FluctuationsVisualizerApp(root)
     root.mainloop()
