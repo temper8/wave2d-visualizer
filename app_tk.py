@@ -4,44 +4,27 @@ import numpy as np
 import h5py
 
 import matplotlib
+
+from plasma_fluctuations import PlasmaFluctuations
 # Указываем Matplotlib использовать движок Tkinter
 matplotlib.use('TkAgg')  
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-H5_FILE = 'z1.h5'
-
-class FluctuationsVisualizerApp:
-    def __init__(self, root):
+class PlasmaFluctuationsVisualizerApp:
+    def __init__(self, root, fluctuations):
         self.root = root
-        self.root.title("Fluctuations")
+        self.data = fluctuations 
+                
+        self.root.title("Plasma Fluctuations")
         self.root.geometry("700x750")
 
         # --- ПЕРЕХВАТ ЗАКРЫТИЯ ОКНА ---
         # Связываем стандартный «крестик» окна с нашим методом очистки
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
-                
-        # 1. Загрузка легких метаданных
-        try:
-            with h5py.File(H5_FILE, 'r') as f:
-                self.rho_1d = f['rho_mesh/rho'][:]
-                self.time_values = f['time_values'][:]
-                self.total_frames, _, self.max_tet_points = f['fluctuations'].shape
-                
-                # Задаем фиксированные границы шкалы по первому кадру
-                base_frame = f['fluctuations'][0, :, :]
-                self.vmin = float(np.nanmin(base_frame))
-                self.vmax = float(np.nanmax(base_frame))
-                
-        except Exception as e:
-            print(f"Ошибка чтения HDF5 файла: {e}")
-            lbl = tk.Label(root, text=f"Ошибка загрузки {H5_FILE}.", fg="red")
-            lbl.pack(pady=20)
-            return
 
         # Подготовка полярной координатной сетки для pcolormesh
-        theta_1d = np.linspace(0, 2 * np.pi, self.max_tet_points)
-        self.T, self.R = np.meshgrid(theta_1d, self.rho_1d)
+        self.T, self.R =  self.data.generate_mesh()
 
         # 2. Создание интерфейса Tkinter
         self.setup_ui()
@@ -51,7 +34,7 @@ class FluctuationsVisualizerApp:
 
     def setup_ui(self):
         # Верхняя панель для вывода времени
-        self.time_label = tk.Label(self.root, text="Время: 0.0000e00 с", font=("Arial", 14, "bold"))
+        self.time_label = tk.Label(self.root, text="Время: 0.00000 с", font=("Arial", 14, "bold"))
         self.time_label.pack(pady=10)
 
         # Создаем холст Matplotlib встроенный в Tkinter
@@ -69,7 +52,7 @@ class FluctuationsVisualizerApp:
         self.quadmesh = self.ax.pcolormesh(
             self.T, self.R, initial_data, 
             cmap='coolwarm', shading='nearest', 
-            vmin=self.vmin, vmax=self.vmax
+            vmin=self.data.vmin, vmax=self.data.vmax
         )
         self.cbar = self.fig.colorbar(self.quadmesh, ax=self.ax, pad=0.05)
         self.cbar.set_label('Плотность флуктуаций (rho_fluc)')
@@ -89,34 +72,27 @@ class FluctuationsVisualizerApp:
         self.slider = ttk.Scale(
             control_frame, 
             from_=0, 
-            to=self.total_frames - 1, 
+            to=self.data.total_frames - 1, 
             orient=tk.HORIZONTAL,
             command=self.on_slider_move
         )
         self.slider.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
-        self.frame_label = tk.Label(control_frame, text=f"0 / {self.total_frames - 1}", font=("Arial", 10))
+        self.frame_label = tk.Label(control_frame, text=f"0 / {self.data.total_frames - 1}", font=("Arial", 10))
         self.frame_label.pack(side=tk.LEFT, padx=5)
 
     def on_slider_move(self, value):
         # Функция вызывается при каждом движении ползунка
         frame_idx = int(float(value))
-        self.frame_label.config(text=f"{frame_idx} / {self.total_frames - 1}")
+        self.frame_label.config(text=f"{frame_idx} / {self.data.total_frames - 1}")
         self.update_plot(frame_idx)
 
     def update_plot(self, frame_idx):
-        # Ленивое чтение: берем только один кадр из HDF5
-        with h5py.File(H5_FILE, 'r') as f:
-            current_frame = f['fluctuations'][frame_idx, :, :]
-        
-        t_val = self.time_values[frame_idx]
-        self.time_label.config(text=f"Время симуляции: {t_val:.4e} с")
+        current_frame = self.data.get_frame(frame_idx)
+        t_val = self.data.get_time_at(frame_idx)
 
-        # КЛЮЧЕВОЙ МОМЕНТ ДЛЯ СКОРОСТИ: 
-        # Вместо перерисовки всего холста, мы просто меняем массив цветов внутри quadmesh!
-        # Метод set_array принимает плоский одномерный массив значений
+        self.time_label.config(text=f"Время симуляции: {t_val:.8f} с")
         self.quadmesh.set_array(current_frame.flatten())
-        
         # Обновляем только сам рисунок на холсте (происходит мгновенно)
         self.canvas.draw_idle()
 
@@ -138,6 +114,8 @@ class FluctuationsVisualizerApp:
 
 # Запуск приложения
 if __name__ == "__main__":
+    fluctuations = PlasmaFluctuations('z1.h5')
     root = tk.Tk()
-    app = FluctuationsVisualizerApp(root)
+    app = PlasmaFluctuationsVisualizerApp(root, fluctuations)
+    root.mainloop()
     root.mainloop()
