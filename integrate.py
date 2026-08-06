@@ -34,3 +34,5 @@ def integrate_on_custom_grid(interp_fluc, interp_field, rho_min, rho_max, N_rho,
     total_integral = trapezoid(integral_theta, x=custom_rho, axis=0)
 
     return float(total_integral)
+
+

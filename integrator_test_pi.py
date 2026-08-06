@@ -3,8 +3,10 @@ from scipy.interpolate import RegularGridInterpolator
 import numpy as np
 
 from integrate import integrate_on_custom_grid
-from interpolator import get_periodic_interpolator
+from interpolator import get_interpolator, get_periodic_interpolator
 from utils import dataset_reader, get_attributes_recursive_from
+
+
 
 # Считываем данные флуктуаций (например, кадр 42)
 with h5py.File('z1.h5', 'r') as f:
@@ -12,7 +14,7 @@ with h5py.File('z1.h5', 'r') as f:
     f_rho = f['rho_mesh/rho'][:]
     # Восстанавливаем исходную равномерную ось theta для флуктуаций
     f_max_tet = f_mat.shape[1]
-    f_theta = np.linspace(0, 2 * np.pi, f_max_tet)
+    f_theta = np.linspace(0, 2 * np.pi, f_max_tet+1)
 
 # Считываем данные функции поля со своей независимой геометрией
 
@@ -28,21 +30,25 @@ field_max_rho, field_max_theta = Ea_field.shape
 print(field_max_rho, field_max_theta)
 field_rho = dataset_reader(file_path, '/coord/rho')
 field_rho= field_rho[0:field_max_rho]
-field_theta = np.linspace(0, 2 * np.pi, field_max_theta)
 
-# --- Этап 1: Создание интерполяторов где-то в коде (например, в классах) ---
-# (Данные очищены от NaN через np.nan_to_num)
-interp_fluc = get_periodic_interpolator(f_rho, f_theta, f_mat)
-interp_field = get_periodic_interpolator(field_rho, field_theta, Ea_field)
+# инициализация массивов 1 для проверки интегрирования
+f_mat[:,:] = 1.0
+Ea_field[:,:] = 1.0
+
+#interp_fluc = get_periodic_interpolator(f_rho, f_max_tet, f_mat)
+#interp_field = get_periodic_interpolator(field_rho, field_max_theta, Ea_field)
+interp_fluc = get_interpolator(f_rho, f_max_tet, f_mat)
+interp_field = get_interpolator(field_rho, field_max_theta, Ea_field)
 
 # --- Этап 2: Вызов нашей сверх-лаконичной функции ---
+print(f"fluct_rho_max = {f_rho[-1]}")
+print(f"field_rho_max = {field_rho[-1]}")
 result = integrate_on_custom_grid(
     interp_fluc=interp_fluc,
     interp_field=interp_field,
-    rho_min=float(f_rho[0]),
-    rho_max=float(f_rho[-1]),
-    N_rho=3000,
-    N_theta=6000
-)
-
+    rho_min=float(field_rho[0]),
+    rho_max=float(field_rho[-1]),
+    N_rho=20000,
+    N_theta=20000
+)/field_rho[-1]/field_rho[-1]
 print(f"Интеграл: {result:.6f}")
