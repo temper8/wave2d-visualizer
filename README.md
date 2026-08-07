@@ -1,2 +1,4 @@
-# wave2d-visualizer
-Wave2d Visualizer
+
+# 🌊 Wave2D Visualizer & Integrator 
+
+Программный комплекс на Python для конвертации, анализа, 2D-визуализации и численного интегрирования результатов моделирования плазмы.
