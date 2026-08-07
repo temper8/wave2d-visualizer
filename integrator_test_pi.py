@@ -4,7 +4,7 @@ import numpy as np
 
 from src.integrate import integrate_on_custom_grid
 from src.interpolator import get_interpolator, get_periodic_interpolator
-from utils import dataset_reader, get_attributes_recursive_from
+from src.utils import dataset_reader, get_attributes_recursive_from
 
 
 

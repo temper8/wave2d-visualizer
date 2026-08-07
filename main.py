@@ -1,4 +1,4 @@
-from utils import dataset_reader, view2d, get_attributes_recursive_from, print_dict
+from src.utils import dataset_reader, view2d, get_attributes_recursive_from, print_dict
 def main():
     print("Hello from wave2d-visualizer!")
     file_path = 'results.h5'

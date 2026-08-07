@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from utils import plot_polar_2d
+from src.utils import plot_polar_2d
 
 files ={
     "polar_mesh" : 'Elmfire_WagD/polar_mesh_z1.dat',
