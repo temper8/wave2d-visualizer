@@ -2,8 +2,8 @@ import h5py
 from scipy.interpolate import RegularGridInterpolator
 import numpy as np
 
-from integrate import integrate_on_custom_grid
-from interpolator import get_interpolator, get_periodic_interpolator
+from src.integrate import integrate_on_custom_grid
+from src.interpolator import get_interpolator, get_periodic_interpolator
 from utils import dataset_reader, get_attributes_recursive_from
 
 
@@ -48,7 +48,7 @@ result = integrate_on_custom_grid(
     interp_field=interp_field,
     rho_min=float(field_rho[0]),
     rho_max=float(field_rho[-1]),
-    N_rho=20000,
-    N_theta=20000
+    N_rho=1000,
+    N_theta=1000
 )/field_rho[-1]/field_rho[-1]
 print(f"Интеграл: {result:.6f}")

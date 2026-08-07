@@ -2,8 +2,8 @@ import h5py
 from scipy.interpolate import RegularGridInterpolator
 import numpy as np
 
-from integrate import integrate_on_custom_grid
-from interpolator import get_periodic_interpolator
+from src.integrate import integrate_on_custom_grid
+from src.interpolator import get_periodic_interpolator
 from utils import dataset_reader, get_attributes_recursive_from
 
 # Считываем данные флуктуаций (например, кадр 42)
@@ -12,7 +12,6 @@ with h5py.File('z1.h5', 'r') as f:
     f_rho = f['rho_mesh/rho'][:]
     # Восстанавливаем исходную равномерную ось theta для флуктуаций
     f_max_tet = f_mat.shape[1]
-    f_theta = np.linspace(0, 2 * np.pi, f_max_tet)
 
 # Считываем данные функции поля со своей независимой геометрией
 
@@ -28,12 +27,11 @@ field_max_rho, field_max_theta = Ea_field.shape
 print(field_max_rho, field_max_theta)
 field_rho = dataset_reader(file_path, '/coord/rho')
 field_rho= field_rho[0:field_max_rho]
-field_theta = np.linspace(0, 2 * np.pi, field_max_theta)
 
 # --- Этап 1: Создание интерполяторов где-то в коде (например, в классах) ---
 # (Данные очищены от NaN через np.nan_to_num)
-interp_fluc = get_periodic_interpolator(f_rho, f_theta, f_mat)
-interp_field = get_periodic_interpolator(field_rho, field_theta, Ea_field)
+interp_fluc = get_periodic_interpolator(f_rho, f_max_tet, f_mat)
+interp_field = get_periodic_interpolator(field_rho, field_max_theta, Ea_field)
 
 # --- Этап 2: Вызов нашей сверх-лаконичной функции ---
 result = integrate_on_custom_grid(

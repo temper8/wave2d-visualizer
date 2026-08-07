@@ -5,7 +5,7 @@ import h5py
 
 import matplotlib
 
-from plasma_fluctuations import PlasmaFluctuations
+from src.plasma_fluctuations import PlasmaFluctuations
 # Указываем Matplotlib использовать движок Tkinter
 matplotlib.use('TkAgg')  
 import matplotlib.pyplot as plt
