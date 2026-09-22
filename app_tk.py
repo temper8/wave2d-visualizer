@@ -114,8 +114,8 @@ class PlasmaFluctuationsVisualizerApp:
 
 # Запуск приложения
 if __name__ == "__main__":
-    fluctuations = PlasmaFluctuations('z1.h5')
+    from src.common.paths import elmfire_converted
+    fluctuations = PlasmaFluctuations(str(elmfire_converted("WagD")))
     root = tk.Tk()
     app = PlasmaFluctuationsVisualizerApp(root, fluctuations)
-    root.mainloop()
     root.mainloop()

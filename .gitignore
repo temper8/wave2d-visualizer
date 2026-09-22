@@ -222,6 +222,7 @@ __marimo__/
 data/
 *.png
 *.h5
+uv.lock
 *.dat
 *.rar
 *.mp4

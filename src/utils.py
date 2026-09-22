@@ -172,8 +172,9 @@ def plot_polar_2d(r, phi, Z, title="2D Полярный график", cmap="vir
 import matplotlib.pyplot as plt
 # Дальнейшая работа с data_array...
 if __name__ == '__main__':
+    from src.common.paths import wave2d_results
     # Укажите путь к вашему HDF5 файлу
-    file_path = 'results.h5'
+    file_path = str(wave2d_results("FT2"))
 
     run_info = get_attributes_recursive_from(file_path, start_path='/run_info')
     print_dict(run_info)

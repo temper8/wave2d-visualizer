@@ -82,30 +82,32 @@
 (по умолчанию `./data`, в `.gitignore`).
 
 ```
-WAVE2D_DATA_DIR/
-├── wave2d/<run_id>/{results.h5, run.json}
-├── elmfire/<run_id>/{raw/, converted/z1.h5}
+data/                              # корень = WAVE2D_DATA_DIR (по умолчанию <repo>/data)
+├── wave2d/{Globus,FT2}/results.h5
+├── elmfire/WagD/{raw/*.dat, converted/z1.h5}
 ├── derived/
-│   ├── plots/<run_id>/
+│   ├── plots/{Globus,FT2}/
+│   ├── frames/WagD/
 │   ├── video/
-│   └── coupling/<elmfire_run>__<wave2d_run>/
-└── catalog.json                    # JSON-индекс всех ранов (без SQL)
+│   └── coupling/
+└── catalog.json                    # JSON-индекс ранов (без SQL) — ещё нет
 ```
 
-- [ ] **(P1) Ввести `WAVE2D_DATA_DIR`** и `src/common/paths.py` — единая точка доступа к данным.
+- [x] **(P1) Ввести `WAVE2D_DATA_DIR`** и `src/common/paths.py` — единая точка доступа к данным.
+- [x] **(P1) Перевести скрипты на `paths.py`** (run_id первым аргументом).
+- [x] **(P1) Мигрировать текущие данные:** `Globus`/`FT2` → `wave2d/<run>/`,
+      `z1.h5` → `elmfire/WagD/converted/`, `.dat` → `elmfire/WagD/raw/`,
+      `plots_2d/` → `derived/frames/WagD/`.
+- [x] **(P2) Разделить source и derived:** PNG/MP4/интегралы — только в `derived/`.
+- [x] **(P3) Автосоздание структуры `data/`** — реализовано `paths.ensure_data_root()`.
 - [ ] **(P1) `run_id` + `run.json`** (sidecar): выжимка из h5-атрибутов без чтения массивов
       (`nphi`, `Nr`, `R0`, `a0`, `wave_freq`, `sha256`, `size`, `format_version`).
 - [ ] **(P1) `src/common/catalog.py`** — `RunCatalog` (чистый JSON, без SQL):
       читает/пишет `catalog.json`, поиск ранов по параметрам, учёт связок
       `couplings(elmfire_run, wave2d_run, params, result)`.
-- [ ] **(P1) Мигрировать текущие данные:** `Globus/` → `wave2d/Globus/`,
-      `results_FT2.h5` → `wave2d/FT2/`, `z1.h5` → `elmfire/<run>/converted/`.
-- [ ] **(P2) Разделить source и derived:** PNG/MP4/интегралы — только в `derived/`.
 - [ ] **(P2) Чек-суммы (`sha256`)** в каталоге для контроля целостности при переносе
       (Globus/NAS).
 - [ ] **(P3) Абстракция хранилища** за `RunCatalog`: локальный диск → DVC / Git LFS / S3.
-- [ ] **(P3) Автосоздание структуры `data/`** в коде (`paths.ensure_data_root()`),
-      чтобы каталоги не терялись и не нужно было создавать вручную.
 
 ## 🧹 Инфраструктура и гигиена
 

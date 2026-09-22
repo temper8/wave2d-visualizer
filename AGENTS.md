@@ -43,6 +43,7 @@ uv run make_video.py          # plots_2d/*.png -> fluctuations_evolution.mp4
 
 ```
 src/
+├── common/paths.py          # единая точка доступа к данным (WAVE2D_DATA_DIR)
 ├── utils.py                 # чтение HDF5, view2d/view_complex_2d, plot_polar_2d
 ├── integrate.py             # integrate_on_custom_grid() — интеграл перекрытия
 ├── interpolator.py          # get_periodic_interpolator / get_interpolator
@@ -60,24 +61,34 @@ make_video.py                # сборка видео
 ## Где лежат данные
 
 Код и данные разделены: данные живут **вне репозитория**, в корне из переменной
-`WAVE2D_DATA_DIR` (по умолчанию `./data`, в `.gitignore`).
+`WAVE2D_DATA_DIR` (по умолчанию `<repo>/data`, в `.gitignore`).
+
+Фактическая структура:
 
 ```
-WAVE2D_DATA_DIR/
-├── wave2d/<run_id>/{results.h5, run.json}   # источник Wave2D
-├── elmfire/<run_id>/{raw/, converted/z1.h5} # источник ELMFIRE
-├── derived/{plots,video,coupling}/          # всё сгенерированное
-└── catalog.json                             # JSON-индекс ранов (без SQL)
+data/
+├── wave2d/
+│   ├── Globus/results.h5     # nphi-014
+│   └── FT2/results.h5        # nphi-122
+├── elmfire/
+│   └── WagD/
+│       ├── raw/*.dat         # nep_z1.dat, polar/rho/time mesh, *.rar
+│       └── converted/z1.h5   # результат converter_to_hdf.py
+└── derived/
+    ├── plots/{Globus,FT2}/   # карты полей (main.py)
+    ├── frames/WagD/          # 945 PNG кадров флуктуаций
+    ├── video/                # fluctuations_evolution.mp4
+    └── coupling/             # результаты интеграла перекрытия
 ```
 
-- Не хардкодить пути к данным — брать корень через `src/common/paths.py`.
-- Искать раны — через `RunCatalog` (`src/common/catalog.py`), а не по именам файлов.
-- Рядом с каждым `*.h5` лежит `run.json` (sidecar) с параметрами и `sha256`.
+- Все пути — только через `src/common/paths.py` (`wave2d_results`, `elmfire_raw`,
+  `elmfire_converted`, `frames_dir`, `video_dir`, `plots_dir`, `derived`, ...).
+  Не хардкодить `results.h5` / `z1.h5` / `Elmfire_WagD`.
+- Скрипты принимают `run_id` первым аргументом (`uv run main.py Globus`,
+  `uv run converter_to_hdf.py WagD`). Значения по умолчанию — `Globus` / `WagD`.
 - Всё, что генерирует код (PNG, MP4, интегралы), писать **только** в `derived/`.
-- Текущие `Globus/`, `FT2/` — это имена ранов (`wave2d/Globus/`, `wave2d/FT2/`).
-
-Легаси-пути (`Elmfire_WagD/`, `plots_2d/`, `results.h5` в корне) существуют, пока идёт
-миграция — см. `TODO.md` → «Организация исходных данных».
+- `catalog.json` и sidecar `run.json` пока **не реализованы** — см. `TODO.md`.
+- Раны: Wave2D `Globus`/`FT2`, ELMFIRE `WagD`. Список — в `src/common/paths.py`.
 
 ## Формат данных (важно)
 

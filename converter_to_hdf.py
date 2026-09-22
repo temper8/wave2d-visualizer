@@ -1,17 +1,23 @@
 import os
+import sys
+
 import h5py
 from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+from src.common.paths import elmfire_raw, elmfire_converted
 from src.utils import plot_polar_2d
 
-files ={
-    "polar_mesh" : 'Elmfire_WagD/polar_mesh_z1.dat',
-    'rho_mesh' : 'Elmfire_WagD/rho_mesh_z1.dat',
-    'time' : 'Elmfire_WagD/time_z1.dat',
-    'data' : 'Elmfire_WagD/nep_z1.dat',
+run_id = sys.argv[1] if len(sys.argv) > 1 else "WagD"
+raw_dir = elmfire_raw(run_id)
+
+files = {
+    "polar_mesh": str(raw_dir / 'polar_mesh_z1.dat'),
+    'rho_mesh': str(raw_dir / 'rho_mesh_z1.dat'),
+    'time': str(raw_dir / 'time_z1.dat'),
+    'data': str(raw_dir / 'nep_z1.dat'),
 }
 
 polar_mesh = pd.read_csv(files['polar_mesh'], sep=r'\s+')
@@ -47,7 +53,9 @@ column_names = ['time_index', 'rho', 'theta', 'd_dens']
 df_dens = pd.read_csv(files['data'], sep=r'\s+', header=None, names=column_names, 
                       dtype={'time_index': int}, nrows=chunksize)
 
-output_h5 = 'z1.h5'
+output_path = elmfire_converted(run_id)
+output_path.parent.mkdir(parents=True, exist_ok=True)
+output_h5 = str(output_path)
 
 with h5py.File(output_h5, 'w') as f:
     # Создаем простые одномерные датасеты

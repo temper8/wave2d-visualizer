@@ -1,9 +1,14 @@
 import glob
 import os
+import sys
+
 import imageio.v3 as iio
 from tqdm import tqdm
 
-output_dir = 'plots_2d'
+from src.common.paths import frames_dir, video_dir
+
+run_id = sys.argv[1] if len(sys.argv) > 1 else "WagD"
+output_dir = str(frames_dir(run_id))
 # --- 3. СБОРКА ВИДЕОРОЛИКА ---
 print("\nСборка видеоролика...")
 
@@ -11,7 +16,8 @@ print("\nСборка видеоролика...")
 images = sorted(glob.glob(os.path.join(output_dir, "*.png")))
 
 if images:
-    video_name = "fluctuations_evolution.mp4"
+    video_dir().mkdir(parents=True, exist_ok=True)
+    video_name = str(video_dir() / "fluctuations_evolution.mp4")
     
     # Читаем кадры и записываем в MP4 видео
     # fps=5 означает 5 кадров в секунду. Подкрутите это число, если видео идет слишком медленно или быстро.

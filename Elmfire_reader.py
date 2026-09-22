@@ -1,10 +1,17 @@
 import os
+import sys
+
 from matplotlib import pyplot as plt
 import pandas as pd
 from tqdm import tqdm
 
+from src.common.paths import elmfire_raw
 
-polar_mesh_file = 'Elmfire_WagD/polar_mesh_z1.dat'
+
+run_id = sys.argv[1] if len(sys.argv) > 1 else "WagD"
+raw_dir = elmfire_raw(run_id)
+
+polar_mesh_file = str(raw_dir / 'polar_mesh_z1.dat')
 
 polar_mesh = pd.read_csv(polar_mesh_file, sep=r'\s+')
 
@@ -15,12 +22,12 @@ print(f"Размер данных: {polar_mesh.shape}")
 print(f"Количество строк: {polar_mesh.shape[0]}")
 print(f"Количество столбцов: {polar_mesh.shape[1]}")
 
-df_times = pd.read_csv('Elmfire_WagD/time_z1.dat', sep=r'\s+', header=None, names=['time_index', 'time_value'])
+df_times = pd.read_csv(str(raw_dir / 'time_z1.dat'), sep=r'\s+', header=None, names=['time_index', 'time_value'])
 df_times.set_index('time_index', inplace=True)
 
 column_names = ['time_index', 'rho', 'theta', 'd_dens']
 
-df_data = pd.read_csv('Elmfire_WagD/nep_z1.dat', sep=r'\s+', header=None, names=column_names, dtype={'time_index': int})
+df_data = pd.read_csv(str(raw_dir / 'nep_z1.dat'), sep=r'\s+', header=None, names=column_names, dtype={'time_index': int})
 
 output_dir = 'plots_2d'
 os.makedirs(output_dir, exist_ok=True)

@@ -2,12 +2,13 @@ import h5py
 from scipy.interpolate import RegularGridInterpolator
 import numpy as np
 
+from src.common.paths import elmfire_converted, wave2d_results
 from src.integrate import integrate_on_custom_grid
 from src.interpolator import get_periodic_interpolator
 from src.utils import dataset_reader, get_attributes_recursive_from
 
 # Считываем данные флуктуаций (например, кадр 42)
-with h5py.File('z1.h5', 'r') as f:
+with h5py.File(str(elmfire_converted("WagD")), 'r') as f:
     f_mat = f['fluctuations'][42, :, :]
     f_rho = f['rho_mesh/rho'][:]
     # Восстанавливаем исходную равномерную ось theta для флуктуаций
@@ -15,7 +16,7 @@ with h5py.File('z1.h5', 'r') as f:
 
 # Считываем данные функции поля со своей независимой геометрией
 
-file_path = 'results.h5'
+file_path = str(wave2d_results("Globus"))
 
 run_params = get_attributes_recursive_from(file_path, start_path='/run_params')
 #print_dict(run_params)    
