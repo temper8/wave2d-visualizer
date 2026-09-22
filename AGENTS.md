@@ -67,7 +67,7 @@ WAVE2D_DATA_DIR/
 ├── wave2d/<run_id>/{results.h5, run.json}   # источник Wave2D
 ├── elmfire/<run_id>/{raw/, converted/z1.h5} # источник ELMFIRE
 ├── derived/{plots,video,coupling}/          # всё сгенерированное
-└── catalog.db                               # SQLite-индекс ранов
+└── catalog.json                             # JSON-индекс ранов (без SQL)
 ```
 
 - Не хардкодить пути к данным — брать корень через `src/common/paths.py`.
