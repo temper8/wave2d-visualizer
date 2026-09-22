@@ -48,6 +48,7 @@ df_dens = pd.read_csv(files['data'], sep=r'\s+', header=None, names=column_names
                       dtype={'time_index': int}, nrows=chunksize)
 
 output_h5 = 'z1.h5'
+
 with h5py.File(output_h5, 'w') as f:
     # Создаем простые одномерные датасеты
     f.create_dataset('rho_mesh/rho', data=rho_1d)
