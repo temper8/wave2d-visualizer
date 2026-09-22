@@ -216,9 +216,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Data (source + derived), see AGENTS.md / TODO.md
+# Корень задаётся через WAVE2D_DATA_DIR, по умолчанию ./data
+data/
 *.png
 *.h5
-uv.lock
 *.dat
 *.rar
 *.mp4

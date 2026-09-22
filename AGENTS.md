@@ -57,7 +57,27 @@ integrator_test_pi.py        # проверка на единичных поля
 make_video.py                # сборка видео
 ```
 
-Данные: `Elmfire_WagD/` (сырьё), `plots_2d/` (945 PNG), `Globus/`, `FT2/` (готовые графики).
+## Где лежат данные
+
+Код и данные разделены: данные живут **вне репозитория**, в корне из переменной
+`WAVE2D_DATA_DIR` (по умолчанию `./data`, в `.gitignore`).
+
+```
+WAVE2D_DATA_DIR/
+├── wave2d/<run_id>/{results.h5, run.json}   # источник Wave2D
+├── elmfire/<run_id>/{raw/, converted/z1.h5} # источник ELMFIRE
+├── derived/{plots,video,coupling}/          # всё сгенерированное
+└── catalog.db                               # SQLite-индекс ранов
+```
+
+- Не хардкодить пути к данным — брать корень через `src/common/paths.py`.
+- Искать раны — через `RunCatalog` (`src/common/catalog.py`), а не по именам файлов.
+- Рядом с каждым `*.h5` лежит `run.json` (sidecar) с параметрами и `sha256`.
+- Всё, что генерирует код (PNG, MP4, интегралы), писать **только** в `derived/`.
+- Текущие `Globus/`, `FT2/` — это имена ранов (`wave2d/Globus/`, `wave2d/FT2/`).
+
+Легаси-пути (`Elmfire_WagD/`, `plots_2d/`, `results.h5` в корне) существуют, пока идёт
+миграция — см. `TODO.md` → «Организация исходных данных».
 
 ## Формат данных (важно)
 

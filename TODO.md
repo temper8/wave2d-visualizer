@@ -75,11 +75,42 @@
 - [ ] **(P3) Шаг 7.** После стабилизации слоёв — оценить физическое разделение на репозитории
       (границы уже позволят сделать это без переписывания).
 
+## 🗄️ Организация исходных данных
+
+Данных будет много (Wave2D-ранов), поэтому код и данные разделяем.
+Данные живут **вне репозитория**, корень задаётся переменной `WAVE2D_DATA_DIR`
+(по умолчанию `./data`, в `.gitignore`).
+
+```
+WAVE2D_DATA_DIR/
+├── wave2d/<run_id>/{results.h5, run.json}
+├── elmfire/<run_id>/{raw/, converted/z1.h5}
+├── derived/
+│   ├── plots/<run_id>/
+│   ├── video/
+│   └── coupling/<elmfire_run>__<wave2d_run>/
+└── catalog.db                      # SQLite-индекс всех ранов
+```
+
+- [ ] **(P1) Ввести `WAVE2D_DATA_DIR`** и `src/common/paths.py` — единая точка доступа к данным.
+- [ ] **(P1) `run_id` + `run.json`** (sidecar): выжимка из h5-атрибутов без чтения массивов
+      (`nphi`, `Nr`, `R0`, `a0`, `wave_freq`, `sha256`, `size`, `format_version`).
+- [ ] **(P1) `src/common/catalog.py`** — `RunCatalog` (SQLite): поиск ранов по параметрам,
+      учёт связок `couplings(elmfire_run, wave2d_run, params, result)`.
+- [ ] **(P1) Мигрировать текущие данные:** `Globus/` → `wave2d/Globus/`,
+      `results_FT2.h5` → `wave2d/FT2/`, `z1.h5` → `elmfire/<run>/converted/`.
+- [ ] **(P2) Разделить source и derived:** PNG/MP4/интегралы — только в `derived/`.
+- [ ] **(P2) Чек-суммы (`sha256`)** в каталоге для контроля целостности при переносе
+      (Globus/NAS).
+- [ ] **(P3) Абстракция хранилища** за `RunCatalog`: локальный диск → DVC / Git LFS / S3.
+
 ## 🧹 Инфраструктура и гигиена
 
 - [ ] **(P2) Добавить `pytest` в dev-зависимости** (`uv add --dev pytest`) и папку `tests/`.
-- [ ] **(P2) Не коммитить крупные бинарники.** `z1.h5` (~214 МБ), `results.h5` (~192 МБ),
-      `Elmfire_WagD/nep_z1.dat` (~2.4 ГБ), `*.rar` — вынести в `.gitignore` / Git LFS.
+- [x] **(P2) Не коммитить крупные бинарники.** В `.gitignore` уже есть `*.h5`, `*.dat`,
+      `*.rar`, `*.mp4`, `*.png`, `*.txt`; добавлен `data/`.
+- [ ] **(P3) `uv.lock` сейчас в `.gitignore`** — обычно lock-файл коммитят для
+      воспроизводимости. Рассмотреть `git add -f uv.lock`.
 - [ ] **(P3) Дописать README** — раздел с физическими величинами и скриншотами.
 - [ ] **(P3) Настроить линтер/форматтер** (ruff) и добавить в CI.
 
