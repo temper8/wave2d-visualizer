@@ -83,7 +83,8 @@
 
 ```
 data/                              # корень = WAVE2D_DATA_DIR (по умолчанию <repo>/data)
-├── wave2d/{Globus,FT2}/results.h5
+├── wave2d/<case_id>/<stamp>/results.h5          # + tasks/<task>/results.h5
+├── wave2d/<case_id>/results.h5                  # legacy-плоско (Globus)
 ├── elmfire/WagD/{raw/*.dat, converted/z1.h5}
 ├── derived/
 │   ├── plots/{Globus,FT2}/
@@ -100,6 +101,14 @@ data/                              # корень = WAVE2D_DATA_DIR (по умо
       `plots_2d/` → `derived/frames/WagD/`.
 - [x] **(P2) Разделить source и derived:** PNG/MP4/интегралы — только в `derived/`.
 - [x] **(P3) Автосоздание структуры `data/`** — реализовано `paths.ensure_data_root()`.
+- [x] **(P1) `Navigator` для Wave2D** — корень задаётся при создании, кейсы
+      (`wave2d/<case_id>`) дискаверятся по ФС, прогон = `<case_id>/<stamp>`;
+      legacy-плоско (`Globus/results.h5`) поддержано. Модульные обёртки сохранены.
+- [ ] **(P1) Перенести ELMFIRE и `derived` в `Navigator`** (сейчас — модульные функции).
+- [ ] **(P1) CLI: `run_id = <case_id>/<stamp>` и `--latest`** в `main.py`;
+      убрать хардкод `wave2d_results("Globus")` из `integrator.py`/`integrator_test_pi.py`.
+- [ ] **(P2) `tests/test_paths.py`** — разбор `run_id`, legacy, дискавери, `latest`
+      (нужен `pytest`).
 - [ ] **(P1) `run_id` + `run.json`** (sidecar): выжимка из h5-атрибутов без чтения массивов
       (`nphi`, `Nr`, `R0`, `a0`, `wave_freq`, `sha256`, `size`, `format_version`).
 - [ ] **(P1) `src/common/catalog.py`** — `RunCatalog` (чистый JSON, без SQL):
