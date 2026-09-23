@@ -1,27 +1,12 @@
-import h5py
 import numpy as np
 
+from src.common.h5reader import H5Reader
+
+
 def dataset_reader(file_path, dataset_name):
-    try:
-        # Открываем файл в режиме чтения
-        with h5py.File(file_path, 'r') as f:
-            # Проверяем существование набора данных
-            if dataset_name not in f:
-                raise ValueError(f"Набор данных '{dataset_name}' не найден в файле")
-            
-            dataset = f[dataset_name]
-                      
-            # Выводим информацию о массиве
-            print(f"Успешно прочитан массив: {dataset_name}")
-            print(f"Размерность: {dataset.shape}")
-            print(f"Тип данных: {dataset.dtype}")
-            
-            # Читаем весь массив в память (осторожно с большими данными!)
-            return np.array(dataset)
-            
-    except Exception as e:
-        print(f"Ошибка: {str(e)}")
-        exit(1)
+    """Читает массив из HDF5 (обёртка над :meth:`H5Reader.array`)."""
+    with H5Reader(file_path) as reader:
+        return reader.array(dataset_name)
 
 def view2d(R,Z, data_2d, title, filename=None):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
@@ -63,73 +48,14 @@ def view_complex_2d(R,Z, data_2d, title, filename=None):
     plt.show()    
 
 def get_dataset_attributes(file_path: str, dataset_path: str) -> dict:
-    """
-    Читает и возвращает все атрибуты указанного датасета из HDF5 файла.
-    
-    :param file_path: Путь к файлу HDF5 (например, 'data.h5')
-    :param dataset_path: Путь к датасету внутри файла (например, '/group/dataset')
-    :return: Словарь со всеми атрибутами датасета
-    """
-    try:
-        with h5py.File(file_path, 'r') as f:
-            # Проверяем существование датасета в файле
-            if dataset_path not in f:
-                print(f"Ошибка: Датасет '{dataset_path}' не найден в файле.")
-                return {}
-            
-            dset = f[dataset_path]
-            # Превращаем интерфейс атрибутов в стандартный словарь Python
-            return dict(dset.attrs.items())
-            
-    except FileNotFoundError:
-        print(f"Ошибка: Файл '{file_path}' не найден.")
-        return {}
-    except Exception as e:
-        print(f"Произошла ошибка при чтении файла: {e}")
-        return {}
+    """Атрибуты объекта HDF5 (обёртка над :meth:`H5Reader.attrs`)."""
+    with H5Reader(file_path) as reader:
+        return reader.attrs(dataset_path)
     
 def get_attributes_recursive_from(file_path: str, start_path: str = '/') -> dict:
-    """
-    Рекурсивно собирает атрибуты, начиная с заданного пути (группы) в HDF5 файле.
-    
-    :param file_path: Путь к файлу HDF5
-    :param start_path: Путь внутри HDF5, с которого начать обход (например, '/my_group')
-    :return: Словарь вида { 'путь_к_объекту': { 'атрибут': значение } }
-    """
-    all_attributes = {}
-    
-    # Нормализуем начальный путь (убираем лишние слэши в конце)
-    start_path = start_path.rstrip('/') or '/'
-
-    def visitor(name, obj):
-        if obj.attrs:
-            # Формируем полный путь к объекту внутри файла
-            #full_path = f"{start_path}/{name}".replace('//', '/')
-            full_path = f"{name}".replace('//', '/')
-            all_attributes[full_path] = dict(obj.attrs.items())
-
-    try:
-        with h5py.File(file_path, 'r') as f:
-            if start_path not in f:
-                print(f"Ошибка: Путь '{start_path}' не найден в файле.")
-                return {}
-                
-            start_obj = f[start_path]
-            
-            # 1. Проверяем атрибуты самого стартового объекта
-            if start_obj.attrs:
-                all_attributes[start_path] = dict(start_obj.attrs.items())
-            
-            # 2. Если это группа, запускаем рекурсивный обход вложенных элементов
-            if isinstance(start_obj, h5py.Group):
-                start_obj.visititems(visitor)
-                
-    except FileNotFoundError:
-        print(f"Ошибка: Файл '{file_path}' не найден.")
-    except Exception as e:
-        print(f"Произошла ошибка при чтении файла: {e}")
-        
-    return all_attributes
+    """Рекурсивные атрибуты (обёртка над :meth:`H5Reader.attrs_recursive`)."""
+    with H5Reader(file_path) as reader:
+        return reader.attrs_recursive(start_path)
 
 def print_dict(d:dict):
     # Вывод результатов

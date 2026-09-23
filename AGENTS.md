@@ -59,7 +59,8 @@ uv run make_video.py          # plots_2d/*.png -> fluctuations_evolution.mp4
 src/
 ├── common/navigator.py      # Navigator + Wave2D/Elmfire/Derived/Data навигаторы
 ├── common/paths.py          # доступ к данным: реэкспорт Navigator + ELMFIRE/derived
-├── utils.py                 # чтение HDF5, view2d/view_complex_2d, plot_polar_2d
+├── common/h5reader.py       # H5Reader — чтение HDF5 (массивы/атрибуты), одно соединение
+├── utils.py                 # обёртки чтения HDF5, view2d/view_complex_2d, plot_polar_2d
 ├── integrate.py             # integrate_on_custom_grid() — интеграл перекрытия
 ├── interpolator.py          # get_periodic_interpolator / get_interpolator
 └── plasma_fluctuations.py   # PlasmaFluctuations — ленивое чтение кадров z1.h5
