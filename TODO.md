@@ -23,7 +23,7 @@
           |
    [ операции ]                 ← interpolate, integrate, visualize
           |
-      [ apps ]                  ← main.py, app_tk.py, integrator.py
+      [ apps ]                  ← w2d_render.py, w2d_app.py, w2d_viewer.py, app_tk.py, integrator.py
 ```
 
 ## 🚧 Блокеры физики (сделать до рефакторинга)
@@ -56,15 +56,15 @@
 - [x] **(P1) `H5Reader`** (`src/common/h5reader.py`) — класс вместо
       `dataset_reader`/`get_*attributes*`: одно соединение, ленивый `dataset()`,
       исключения вместо `exit()`. Обёртки в `src/utils.py` сохранены (бросают).
-- [x] **(P1) `main.py` переведён на `with H5Reader(...)`** — одно соединение на
+- [x] **(P1) `w2d_render.py` переведён на `with H5Reader(...)`** — одно соединение на
       все чтения вместо N открытий файла.
 - [x] **(P1) `w2d_viewer.py`** — GUI: дерево `results.h5` (через `H5Reader.walk`)
       + изображение выбранного датасета; единое соединение, виды `(R,Z)`/`(rho,θ)`,
       `real/imag/abs`, панель атрибутов, `NavigationToolbar`.
-- [x] **(P1) `w2d_navigator.py`** — GUI-выбор прогона по ФС (`Wave2DNavigator`:
+- [x] **(P1) `w2d_app.py`** — GUI-выбор прогона по ФС (`Wave2DNavigator`:
       кейсы/прогоны/задачи), сводка `run_info`/`run_params`, запуск `w2d_viewer`
       в `Toplevel`. Добавлены `Wave2DNavigator.tasks()` + `wave2d_tasks()`.
-- [ ] **(P1) Шаг 2.** Вынести `Wave2DResults` из `main.py` + `src/utils.py`
+- [ ] **(P1) Шаг 2.** Вынести `Wave2DResults` из `w2d_render.py` + `src/utils.py`
       (сейчас логика размазана между скриптом и утилитами).
 - [ ] **(P1) Шаг 3.** Обернуть `PlasmaFluctuations` → `ElmfireFluctuations`,
       возвращающий `Field2D` / `FieldTimeSeries` вместо сырых массивов.
@@ -80,7 +80,7 @@
       ├── elmfire/     # адаптер ELMFIRE: raw_reader.py, convert.py, fluctuations.py
       ├── coupling/    # пересечение: overlap.py
       ├── viz/         # общая визуализация
-      └── apps/        # main.py, app_tk.py, integrator.py
+      └── apps/        # w2d_render.py, w2d_app.py, w2d_viewer.py, app_tk.py, integrator.py
       ```
 
 - [ ] **(P3) Шаг 7.** После стабилизации слоёв — оценить физическое разделение на репозитории
@@ -120,11 +120,11 @@ data/                              # корень = WAVE2D_DATA_DIR (по умо
       legacy-плоско (`Globus/results.h5`) поддержано. Обёртки `wave2d_*`
       сохранены, `paths.py` реэкспортирует навигаторы.
 - [ ] **(P1) Перенести ELMFIRE и `derived` в `Navigator`** (сейчас — модульные функции).
-- [x] **(P1) `main.py` открывает `run_id = <case_id>/<stamp>`**; по умолчанию —
+- [x] **(P1) `w2d_render.py` открывает `run_id = <case_id>/<stamp>`**; по умолчанию —
       свежий прогон FT2 (`wave2d_latest("FT2")`). Заодно исправлено: формат
       группы `nphi+122` и путь `field_2D` (было `field_2d`), `print_dict` без
       cp1251-непечатаемых символов.
-- [ ] **(P1) Флаг `--latest`** в `main.py` (явный выбор свежего прогона кейса).
+- [ ] **(P1) Флаг `--latest`** в `w2d_render.py` (явный выбор свежего прогона кейса).
 - [ ] **(P1) Убрать хардкод `wave2d_results("Globus")`** из
       `integrator.py`/`integrator_test_pi.py`.
 - [ ] **(P2) `tests/test_paths.py`** — разбор `run_id`, legacy, дискавери, `latest`

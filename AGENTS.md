@@ -47,9 +47,9 @@ Python-комплекс для конвертации, 2D-визуализаци
 
 ```bash
 uv run converter_to_hdf.py    # Elmfire_WagD/*.dat -> z1.h5
-uv run main.py                # 2D-графики полей из results.h5
+uv run w2d_render.py          # 2D-графики полей из results.h5
 uv run w2d_viewer.py          # GUI: дерево results.h5 + изображение поля
-uv run w2d_navigator.py       # GUI: выбор прогона Wave2D -> открыть w2d_viewer
+uv run w2d_app.py             # GUI: выбор прогона Wave2D -> открыть w2d_viewer
 uv run app_tk.py              # GUI просмотра флуктуаций
 uv run integrator.py          # интеграл перекрытия
 uv run make_video.py          # plots_2d/*.png -> fluctuations_evolution.mp4
@@ -69,9 +69,9 @@ src/
 converter_to_hdf.py          # ELMFIRE .dat -> HDF5
 Elmfire_reader.py            # просмотр структуры .dat
 count_point_per_index.py     # точек на временной индекс
-main.py                      # 2D-визуализация полей Wave2D
+w2d_render.py                # 2D-визуализация полей Wave2D
 w2d_viewer.py                # GUI: дерево HDF5 + просмотр датасета
-w2d_navigator.py             # GUI: выбор прогона Wave2D -> w2d_viewer
+w2d_app.py                   # GUI: выбор прогона Wave2D -> w2d_viewer
 app_tk.py / app_vis_fluct_tk.py  # GUI (дубликаты!)
 integrator.py                # пример интеграла перекрытия
 integrator_test_pi.py        # проверка на единичных полях
@@ -100,7 +100,7 @@ data/
 │       ├── raw/*.dat         # nep_z1.dat, polar/rho/time mesh, *.rar
 │       └── converted/z1.h5   # результат converter_to_hdf.py
 └── derived/
-    ├── plots/{Globus,FT2}/   # карты полей (main.py)
+    ├── plots/{Globus,FT2}/   # карты полей (w2d_render.py)
     ├── frames/WagD/          # 945 PNG кадров флуктуаций
     ├── video/                # fluctuations_evolution.mp4
     └── coupling/             # результаты интеграла перекрытия
@@ -109,8 +109,8 @@ data/
 - Все пути — только через `src/common/paths.py` (`wave2d_results`, `elmfire_raw`,
   `elmfire_converted`, `frames_dir`, `video_dir`, `plots_dir`, `derived`, ...).
   Не хардкодить `results.h5` / `z1.h5` / `Elmfire_WagD`.
-- Скрипты принимают `run_id` первым аргументом (`uv run main.py FT2/2026-09-23_21-58-05`,
-  `uv run converter_to_hdf.py WagD`). `main.py` по умолчанию берёт свежий прогон FT2
+- Скрипты принимают `run_id` первым аргументом (`uv run w2d_render.py FT2/2026-09-23_21-58-05`,
+  `uv run converter_to_hdf.py WagD`). `w2d_render.py` по умолчанию берёт свежий прогон FT2
   (`wave2d_latest("FT2")`); ELMFIRE — `WagD`.
 - Всё, что генерирует код (PNG, MP4, интегралы), писать **только** в `derived/`.
 - `catalog.json` и sidecar `run.json` пока **не реализованы** — см. `TODO.md`.

@@ -8,7 +8,7 @@
 
 Запуск::
 
-    uv run w2d_navigator.py [<data_root>]   # по умолчанию WAVE2D_DATA_DIR/<repo>/data
+    uv run w2d_app.py [<data_root>]   # по умолчанию WAVE2D_DATA_DIR/<repo>/data
 """
 
 import sys

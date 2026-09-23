@@ -55,7 +55,9 @@ wave2d-visualizer/
 ├── converter_to_hdf.py          # ELMFIRE .dat -> HDF5 (z1.h5)
 ├── Elmfire_reader.py            # просмотр структуры .dat-файлов
 ├── count_point_per_index.py     # число точек на каждый временной индекс
-├── main.py                      # 2D-визуализация полей из results.h5
+├── w2d_render.py                # 2D-визуализация полей из results.h5
+├── w2d_app.py                   # GUI: выбор прогона Wave2D -> w2d_viewer
+├── w2d_viewer.py                # GUI: дерево HDF5 + просмотр датасета
 ├── app_tk.py                    # GUI: просмотр флуктуаций (Tkinter + Matplotlib)
 ├── app_vis_fluct_tk.py          # GUI-дубликат app_tk.py
 ├── integrator.py                # пример интегрирования по кадру флуктуаций
@@ -80,7 +82,7 @@ data/
 │       ├── raw/*.dat         # исходные файлы ELMFIRE
 │       └── converted/z1.h5   # результат converter_to_hdf.py
 └── derived/
-    ├── plots/{Globus,FT2}/   # карты полей (main.py)
+    ├── plots/{Globus,FT2}/   # карты полей (w2d_render.py)
     ├── frames/WagD/          # PNG-кадры флуктуаций
     ├── video/                # fluctuations_evolution.mp4
     └── coupling/             # результаты интеграла перекрытия
@@ -125,8 +127,15 @@ uv run count_point_per_index.py WagD
 из `results.h5` и сохраняет их в `data/derived/plots/<run>/`:
 
 ```bash
-uv run main.py Globus
-uv run main.py FT2
+uv run w2d_render.py                          # свежий прогон FT2
+uv run w2d_render.py FT2/2026-09-23_21-58-05  # конкретный прогон
+```
+
+Интерактивный просмотр полей (дерево файла, выбор прогона):
+
+```bash
+uv run w2d_app.py        # навигатор по прогонам -> открыть viewer
+uv run w2d_viewer.py     # viewer для свежего прогона FT2
 ```
 
 ### 4. Интерактивный просмотр флуктуаций
