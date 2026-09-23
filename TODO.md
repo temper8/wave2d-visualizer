@@ -58,6 +58,9 @@
       исключения вместо `exit()`. Обёртки в `src/utils.py` сохранены (бросают).
 - [x] **(P1) `main.py` переведён на `with H5Reader(...)`** — одно соединение на
       все чтения вместо N открытий файла.
+- [x] **(P1) `w2d_viewer.py`** — GUI: дерево `results.h5` (через `H5Reader.walk`)
+      + изображение выбранного датасета; единое соединение, виды `(R,Z)`/`(rho,θ)`,
+      `real/imag/abs`, панель атрибутов, `NavigationToolbar`.
 - [ ] **(P1) Шаг 2.** Вынести `Wave2DResults` из `main.py` + `src/utils.py`
       (сейчас логика размазана между скриптом и утилитами).
 - [ ] **(P1) Шаг 3.** Обернуть `PlasmaFluctuations` → `ElmfireFluctuations`,

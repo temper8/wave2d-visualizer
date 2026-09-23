@@ -48,6 +48,7 @@ Python-комплекс для конвертации, 2D-визуализаци
 ```bash
 uv run converter_to_hdf.py    # Elmfire_WagD/*.dat -> z1.h5
 uv run main.py                # 2D-графики полей из results.h5
+uv run w2d_viewer.py          # GUI: дерево results.h5 + изображение поля
 uv run app_tk.py              # GUI просмотра флуктуаций
 uv run integrator.py          # интеграл перекрытия
 uv run make_video.py          # plots_2d/*.png -> fluctuations_evolution.mp4
@@ -68,6 +69,7 @@ converter_to_hdf.py          # ELMFIRE .dat -> HDF5
 Elmfire_reader.py            # просмотр структуры .dat
 count_point_per_index.py     # точек на временной индекс
 main.py                      # 2D-визуализация полей Wave2D
+w2d_viewer.py                # GUI: дерево HDF5 + просмотр датасета
 app_tk.py / app_vis_fluct_tk.py  # GUI (дубликаты!)
 integrator.py                # пример интеграла перекрытия
 integrator_test_pi.py        # проверка на единичных полях

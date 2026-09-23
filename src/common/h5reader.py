@@ -83,6 +83,28 @@ class H5Reader:
         """Имена дочерних объектов группы."""
         return list(self.file[path].keys())
 
+    def walk(self, path: str = "/") -> list[tuple[str, str, object]]:
+        """Обход поддерева: список ``(полный_путь, kind, объект)``.
+
+        ``kind`` — ``"group"`` или ``"dataset"``. Обход в глубину
+        (``h5py.visititems``), поэтому родители идут перед детьми.
+        """
+        path = path.rstrip("/") or "/"
+        if path not in self.file:
+            raise KeyError(f"Путь '{path}' не найден в {self.path}")
+        prefix = "" if path == "/" else path
+        result: list[tuple[str, str, object]] = []
+
+        def visitor(name: str, obj) -> None:
+            full = f"{prefix}/{name}".replace("//", "/")
+            kind = "group" if isinstance(obj, h5py.Group) else "dataset"
+            result.append((full, kind, obj))
+
+        start = self.file[path]
+        if isinstance(start, h5py.Group):
+            start.visititems(visitor)
+        return result
+
     # --- массивы ---------------------------------------------------------
 
     def dataset(self, name: str) -> h5py.Dataset:
