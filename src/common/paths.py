@@ -39,6 +39,7 @@ from src.common.navigator import (  # noqa: F401
     wave2d_results,
     wave2d_runs,
     wave2d_task_results,
+    wave2d_tasks,
 )
 
 __all__ = [
@@ -56,6 +57,7 @@ __all__ = [
     "wave2d_results",
     "wave2d_runs",
     "wave2d_task_results",
+    "wave2d_tasks",
     "ELMFIRE_RUNS",
     "elmfire_dir",
     "elmfire_raw",

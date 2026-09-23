@@ -120,6 +120,13 @@ class Wave2DNavigator(Navigator):
         """Файл отдельной задачи: ``<run>/tasks/<task>/results.h5``."""
         return self.run_dir(run_id) / "tasks" / task / name
 
+    def tasks(self, run_id: str) -> list[str]:
+        """Список задач прогона = подкаталоги ``<run>/tasks``."""
+        tasks_dir = self.run_dir(run_id) / "tasks"
+        if not tasks_dir.is_dir():
+            return []
+        return sorted(p.name for p in tasks_dir.iterdir() if p.is_dir())
+
     def runs(self, case_id: str | None = None) -> list[str]:
         """Список прогонов: внутри кейса или по всем кейсам (``case_id=None``)."""
         if case_id is not None:
@@ -236,6 +243,11 @@ def wave2d_task_results(
 ) -> Path:
     """Файл задачи (обёртка над :meth:`Wave2DNavigator.task_results`)."""
     return default_navigator().wave2d.task_results(run_id, task, name)
+
+
+def wave2d_tasks(run_id: str) -> list[str]:
+    """Задачи прогона (обёртка над :meth:`Wave2DNavigator.tasks`)."""
+    return default_navigator().wave2d.tasks(run_id)
 
 
 def wave2d_cases() -> list[str]:

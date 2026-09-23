@@ -61,6 +61,9 @@
 - [x] **(P1) `w2d_viewer.py`** — GUI: дерево `results.h5` (через `H5Reader.walk`)
       + изображение выбранного датасета; единое соединение, виды `(R,Z)`/`(rho,θ)`,
       `real/imag/abs`, панель атрибутов, `NavigationToolbar`.
+- [x] **(P1) `w2d_navigator.py`** — GUI-выбор прогона по ФС (`Wave2DNavigator`:
+      кейсы/прогоны/задачи), сводка `run_info`/`run_params`, запуск `w2d_viewer`
+      в `Toplevel`. Добавлены `Wave2DNavigator.tasks()` + `wave2d_tasks()`.
 - [ ] **(P1) Шаг 2.** Вынести `Wave2DResults` из `main.py` + `src/utils.py`
       (сейчас логика размазана между скриптом и утилитами).
 - [ ] **(P1) Шаг 3.** Обернуть `PlasmaFluctuations` → `ElmfireFluctuations`,
