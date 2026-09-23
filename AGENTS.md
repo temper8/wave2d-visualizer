@@ -25,12 +25,12 @@ Python-комплекс для конвертации, 2D-визуализаци
 
 | | **Wave2D** | **ELMFIRE** |
 |---|---|---|
-| Файлы | `results.h5`, `results_FT2.h5` | `Elmfire_WagD/*.dat` → `z1.h5` |
+| Файлы | `results.h5` (+ `tasks/<задача>/results.h5`) | `Elmfire_WagD/*.dat` → `z1.h5` |
 | Что это | стационарные 2D-поля (решение волнового уравнения) | временной ряд турбулентных флуктуаций |
-| Сетка | `(rho, theta)`, обычно `(361, 1024)` | `(121, 600)` |
+| Сетка | `(rho, theta)`: Globus `(361, 1024)`, FT2 `(51, 128)` | `(121, 600)` |
 | Время | нет | 945 кадров |
 | Тип данных | `complex128` (Ex/Ey/Ez, eps, eta, gee) | `float32`, вещественное |
-| Параметр | тороидальное число `nphi` (`nphi-014`) | — |
+| Параметр | тороидальное число `nphi` (`nphi+122`); бывает серия по `Nr` | — |
 
 **Единственное пересечение** — интеграл перекрытия
 `∫ f_ELMFIRE(t,ρ,θ)·Ea_Wave2D(ρ,θ)·ρ dρ dθ` в `integrator.py`. Его целевое место —
@@ -82,8 +82,13 @@ make_video.py                # сборка видео
 ```
 data/
 ├── wave2d/
-│   ├── Globus/results.h5     # nphi-014
-│   └── FT2/results.h5        # nphi-122
+│   ├── Globus/
+│   │   └── results.h5               # один прогон, nphi-014, (361, 1024)
+│   └── FT2/                         # конфигурация; внутри — прогоны по датам
+│       └── <timestamp>/             # напр. 2026-09-23_21-58-05
+│           ├── results.h5           # общий файл серии по nphi (5 мод)
+│           ├── input.toml, done_tasks.txt, system_info.ini, ...
+│           └── tasks/<задача>/results.h5   # по файлу на моду: nphi+000 … nphi-122
 ├── elmfire/
 │   └── WagD/
 │       ├── raw/*.dat         # nep_z1.dat, polar/rho/time mesh, *.rar
@@ -102,13 +107,19 @@ data/
   `uv run converter_to_hdf.py WagD`). Значения по умолчанию — `Globus` / `WagD`.
 - Всё, что генерирует код (PNG, MP4, интегралы), писать **только** в `derived/`.
 - `catalog.json` и sidecar `run.json` пока **не реализованы** — см. `TODO.md`.
-- Раны: Wave2D `Globus`/`FT2`, ELMFIRE `WagD`. Список — в `src/common/paths.py`.
+- Раны: Wave2D — `Globus` (плоско: `Globus/results.h5`) и `FT2` (конфигурация
+  с прогонами `FT2/<timestamp>/`), ELMFIRE — `WagD`. Список — в `src/common/paths.py`.
+- **Внимание:** `paths.py` пока не знает про уровень `<timestamp>`:
+  `wave2d_results("FT2")` указывает на отсутствующий `data/wave2d/FT2/results.h5`.
+  Согласовать API путей перед запуском скриптов на FT2 (см. `TODO.md`).
 
 ## Формат данных
 
 Формат HDF5-файлов вынесен в отдельные спецификации — не дублировать его здесь:
 
-- **Wave2D** (`results.h5`) — [`docs/results_h5.md`](docs/results_h5.md).
+- **Wave2D** (`results.h5`) — [`docs/hdf5_schema.md`](docs/hdf5_schema.md)
+  (канон, продюсерская спека) и [`docs/results_h5.md`](docs/results_h5.md)
+  (читательская: наблюдения, инварианты, подводные камни).
 - **ELMFIRE** (`z1.h5`) — [`docs/elmfire_h5.md`](docs/elmfire_h5.md)
   (черновик, формат ещё не изучен).
 
@@ -129,9 +140,15 @@ data/
    Не строишь интеграл, пока не убедился в согласованности единиц (множитель 100).
 2. **`get_interpolator` (непериодический) содержит баг** с `endpoint=True`.
    Использовать `get_periodic_interpolator`. Подробности — в `TODO.md`.
-3. **`coord/rho` = 397 ≠ Nr = 361.** Первые 361 — физическая сетка, остальное — margin.
-   Не используй `coord/rho` целиком.
+3. **`coord/rho` = 397 ≠ Nr = 361 (Globus).** Первые `Nr` — физическая сетка,
+   остальное — margin. Не используй `coord/rho` целиком.
 4. **`integrator.py` хардкодит кадр 42.** Постановка интеграла ещё не зафиксирована.
+5. **FT2 — вложенный каталог прогонов.** Единого `FT2/results.h5` больше нет:
+   данные лежат в `FT2/<timestamp>/` (`results.h5` — общий файл серии по `nphi`,
+   `tasks/<задача>/results.h5` — по моде). `paths.py` этого пока не учитывает.
+6. **Сентинелы на оси `ir = 0` — `0.0`, а не `NaN`.** Незаполненные точки равны
+   нулю; в `plasma_par_2D` вне первой точки — мусор. Подробности —
+   [`docs/results_h5.md`](docs/results_h5.md).
 
 ## Приоритеты
 
