@@ -43,7 +43,11 @@
 ```
 wave2d-visualizer/
 ├── src/
-│   ├── common/paths.py          # единая точка доступа к данным (WAVE2D_DATA_DIR)
+│   ├── common/paths.py          # доступ к данным (WAVE2D_DATA_DIR) + Navigator
+│   ├── common/navigator.py      # Navigator + Wave2D/Elmfire/Derived навигаторы
+│   ├── common/h5reader.py       # H5Reader — чтение HDF5 (массивы/атрибуты)
+│   ├── wave2d/viewer.py         # W2DViewer — просмотр results.h5
+│   ├── wave2d/app.py            # W2DNavigatorApp — GUI-навигатор по прогонам
 │   ├── utils.py                 # чтение HDF5, 2D-визуализация полей, вывод атрибутов
 │   ├── integrate.py             # интеграл произведения флуктуаций и поля
 │   ├── interpolator.py          # построение интерполяторов (с замыканием theta и без)
@@ -56,8 +60,8 @@ wave2d-visualizer/
 ├── Elmfire_reader.py            # просмотр структуры .dat-файлов
 ├── count_point_per_index.py     # число точек на каждый временной индекс
 ├── w2d_render.py                # 2D-визуализация полей из results.h5
-├── w2d_app.py                   # GUI: выбор прогона Wave2D -> w2d_viewer
-├── w2d_viewer.py                # GUI: дерево HDF5 + просмотр датасета
+├── w2d_app.py                   # точка входа: GUI-навигатор по прогонам
+├── w2d_viewer.py                # точка входа: GUI-просмотрщик датасета
 ├── app_tk.py                    # GUI: просмотр флуктуаций (Tkinter + Matplotlib)
 ├── app_vis_fluct_tk.py          # GUI-дубликат app_tk.py
 ├── integrator.py                # пример интегрирования по кадру флуктуаций

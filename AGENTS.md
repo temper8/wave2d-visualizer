@@ -65,13 +65,16 @@ src/
 ├── utils.py                 # обёртки чтения HDF5, view2d/view_complex_2d, plot_polar_2d
 ├── integrate.py             # integrate_on_custom_grid() — интеграл перекрытия
 ├── interpolator.py          # get_periodic_interpolator / get_interpolator
-└── plasma_fluctuations.py   # PlasmaFluctuations — ленивое чтение кадров z1.h5
+├── plasma_fluctuations.py   # PlasmaFluctuations — ленивое чтение кадров z1.h5
+└── wave2d/
+    ├── viewer.py            # W2DViewer — окно просмотра results.h5
+    └── app.py               # W2DNavigatorApp — GUI-навигатор по прогонам
 converter_to_hdf.py          # ELMFIRE .dat -> HDF5
 Elmfire_reader.py            # просмотр структуры .dat
 count_point_per_index.py     # точек на временной индекс
 w2d_render.py                # 2D-визуализация полей Wave2D
-w2d_viewer.py                # GUI: дерево HDF5 + просмотр датасета
-w2d_app.py                   # GUI: выбор прогона Wave2D -> w2d_viewer
+w2d_viewer.py                # точка входа GUI-просмотрщика (логика в src/wave2d/)
+w2d_app.py                   # точка входа GUI-навигатора (логика в src/wave2d/)
 app_tk.py / app_vis_fluct_tk.py  # GUI (дубликаты!)
 integrator.py                # пример интеграла перекрытия
 integrator_test_pi.py        # проверка на единичных полях
