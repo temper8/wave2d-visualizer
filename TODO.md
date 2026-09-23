@@ -56,8 +56,8 @@
 - [x] **(P1) `H5Reader`** (`src/common/h5reader.py`) — класс вместо
       `dataset_reader`/`get_*attributes*`: одно соединение, ленивый `dataset()`,
       исключения вместо `exit()`. Обёртки в `src/utils.py` сохранены (бросают).
-- [ ] **(P1) Перевести `main.py` на `with H5Reader(...)`** (одно соединение на
-      все чтения вместо N открытий файла).
+- [x] **(P1) `main.py` переведён на `with H5Reader(...)`** — одно соединение на
+      все чтения вместо N открытий файла.
 - [ ] **(P1) Шаг 2.** Вынести `Wave2DResults` из `main.py` + `src/utils.py`
       (сейчас логика размазана между скриптом и утилитами).
 - [ ] **(P1) Шаг 3.** Обернуть `PlasmaFluctuations` → `ElmfireFluctuations`,
