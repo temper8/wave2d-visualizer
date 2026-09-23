@@ -104,35 +104,15 @@ data/
 - `catalog.json` и sidecar `run.json` пока **не реализованы** — см. `TODO.md`.
 - Раны: Wave2D `Globus`/`FT2`, ELMFIRE `WagD`. Список — в `src/common/paths.py`.
 
-## Формат данных (важно)
+## Формат данных
 
-### `results.h5` (Wave2D)
+Формат HDF5-файлов вынесен в отдельные спецификации — не дублировать его здесь:
 
-```
-/coord/{X,Y}                 (361,1024)  meshgrid для pcolormesh
-/coord/rho                   (397,)      397 = Nrmargin, физическая часть = 361
-/run_params/w2grid           attrs: Nr=361, Nrmargin=397, nphi1=-14, Msmax=1024
-/{nphi}/field_2d/{Ea,Ex,Ey,Ez}
-/di_tensor_2D/{eps,eta,gee,L,aMX,aTT}
-/flux_surf_2D/{psi,theta_deg,theta_pi_diff}
-/magnt_fld_2D/{Btot,Bpol,Btor,Nparall,...}
-/plasma_par_2D/{Te,Ti,ne,VRe,VRi,coll_rate,damp_rate}
-/resonance_2D/{w0_wpe,w0_wce,w0_wlh,w0_wuh,Xcutoff_at_0,PolRes_at_0}
-/wkb_2D/{Nrho1,Nrho2}
-```
+- **Wave2D** (`results.h5`) — [`docs/results_h5.md`](docs/results_h5.md).
+- **ELMFIRE** (`z1.h5`) — [`docs/elmfire_h5.md`](docs/elmfire_h5.md)
+  (черновик, формат ещё не изучен).
 
-Имя группы `nphi` формируется из `run_params['w2grid']['nphi1']`:
-`f"nphi-{abs(n):03d}"` при `n<0`, иначе `f"nphi{n:03d}"`.
-
-### `z1.h5` (ELMFIRE)
-
-```
-/rho_mesh/rho       (121,)        1D радиусы (в исходнике — сантиметры!)
-/rho_mesh/N_theta   (121,)        число угловых точек на радиус
-/time_indices       (945,)
-/time_values        (945,)        физическое время
-/fluctuations       (945,121,600) (time, rho, theta), float32, gzip
-```
+При работе с файлами сверяйся со спеками; при изменении формата обновляй спеку.
 
 ## Соглашения
 
