@@ -109,8 +109,13 @@ data/                              # корень = WAVE2D_DATA_DIR (по умо
       legacy-плоско (`Globus/results.h5`) поддержано. Обёртки `wave2d_*`
       сохранены, `paths.py` реэкспортирует навигаторы.
 - [ ] **(P1) Перенести ELMFIRE и `derived` в `Navigator`** (сейчас — модульные функции).
-- [ ] **(P1) CLI: `run_id = <case_id>/<stamp>` и `--latest`** в `main.py`;
-      убрать хардкод `wave2d_results("Globus")` из `integrator.py`/`integrator_test_pi.py`.
+- [x] **(P1) `main.py` открывает `run_id = <case_id>/<stamp>`**; по умолчанию —
+      свежий прогон FT2 (`wave2d_latest("FT2")`). Заодно исправлено: формат
+      группы `nphi+122` и путь `field_2D` (было `field_2d`), `print_dict` без
+      cp1251-непечатаемых символов.
+- [ ] **(P1) Флаг `--latest`** в `main.py` (явный выбор свежего прогона кейса).
+- [ ] **(P1) Убрать хардкод `wave2d_results("Globus")`** из
+      `integrator.py`/`integrator_test_pi.py`.
 - [ ] **(P2) `tests/test_paths.py`** — разбор `run_id`, legacy, дискавери, `latest`
       (нужен `pytest`).
 - [ ] **(P1) `run_id` + `run.json`** (sidecar): выжимка из h5-атрибутов без чтения массивов

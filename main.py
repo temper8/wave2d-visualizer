@@ -1,11 +1,11 @@
 import sys
 
-from src.common.paths import wave2d_results, plots_dir
+from src.common.paths import wave2d_results, plots_dir, wave2d_latest
 from src.utils import dataset_reader, view2d, get_attributes_recursive_from, print_dict
 
 
 def main():
-    run_id = sys.argv[1] if len(sys.argv) > 1 else "Globus"
+    run_id = sys.argv[1] if len(sys.argv) > 1 else wave2d_latest("FT2")
     file_path = str(wave2d_results(run_id))
     out_dir = plots_dir(run_id)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -14,7 +14,7 @@ def main():
     run_params = get_attributes_recursive_from(file_path, start_path='/run_params')
     print_dict(run_params)
     nphi = run_params['w2grid']['nphi1']
-    nphi = f"nphi-{abs(nphi):03d}" if nphi < 0 else f"nphi{nphi:03d}"
+    nphi = f"nphi{nphi:+04d}"  # канон: nphi+122 / nphi-014
     print(nphi)
 
     def save(title: str) -> str:
@@ -29,10 +29,10 @@ def main():
     theta_deg = dataset_reader(file_path, '/flux_surf_2D/theta_deg')
     view2d(R, Z, theta_deg, "theta_deg", save("theta_deg"))
 
-    Ea_field = dataset_reader(file_path, f'/{nphi}/field_2d/Ea')
+    Ea_field = dataset_reader(file_path, f'/{nphi}/field_2D/Ea')
     view2d(R, Z, Ea_field, "Ea", save("Ea"))
 
-    Ex_field = dataset_reader(file_path, f'/{nphi}/field_2d/Ex')
+    Ex_field = dataset_reader(file_path, f'/{nphi}/field_2D/Ex')
     view2d(R, Z, Ex_field.real, "Ex.real", save("Ex.real"))
     view2d(R, Z, Ex_field.imag, "Ex.imag", save("Ex.imag"))
 

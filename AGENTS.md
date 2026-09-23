@@ -104,8 +104,9 @@ data/
 - Все пути — только через `src/common/paths.py` (`wave2d_results`, `elmfire_raw`,
   `elmfire_converted`, `frames_dir`, `video_dir`, `plots_dir`, `derived`, ...).
   Не хардкодить `results.h5` / `z1.h5` / `Elmfire_WagD`.
-- Скрипты принимают `run_id` первым аргументом (`uv run main.py Globus`,
-  `uv run converter_to_hdf.py WagD`). Значения по умолчанию — `Globus` / `WagD`.
+- Скрипты принимают `run_id` первым аргументом (`uv run main.py FT2/2026-09-23_21-58-05`,
+  `uv run converter_to_hdf.py WagD`). `main.py` по умолчанию берёт свежий прогон FT2
+  (`wave2d_latest("FT2")`); ELMFIRE — `WagD`.
 - Всё, что генерирует код (PNG, MP4, интегралы), писать **только** в `derived/`.
 - `catalog.json` и sidecar `run.json` пока **не реализованы** — см. `TODO.md`.
 - Wave2D: кейсы (`case_id`: `Globus`, `FT2`, ...) — подкаталоги `data/wave2d/`;

@@ -136,7 +136,7 @@ def print_dict(d:dict):
     for object_path, attrs in d.items():
         print(f"Объект: {object_path}")
         for attr_name, attr_value in attrs.items():
-            print(f"  └─ {attr_name}: {attr_value}")
+            print(f"  - {attr_name}: {attr_value}")
 
 
 
