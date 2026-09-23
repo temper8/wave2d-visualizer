@@ -1,7 +1,15 @@
 """Навигация по каталогу данных.
 
-Корень данных задаётся при создании :class:`Navigator`; по умолчанию берётся
-из переменной окружения ``WAVE2D_DATA_DIR`` или ``<repo>/data``.
+Корень данных задаётся при создании навигатора; по умолчанию берётся из
+переменной окружения ``WAVE2D_DATA_DIR`` или ``<repo>/data``.
+
+Иерархия классов::
+
+    Navigator              # база: общий корень + path()
+    ├── Wave2DNavigator    # wave2d/<case_id>[/<stamp>]/...
+    ├── ElmfireNavigator   # заглушка (TODO)
+    ├── DerivedNavigator   # заглушка (TODO)
+    └── DataNavigator      # фасад: nav.wave2d / nav.elmfire / nav.derived
 
 Раскладка Wave2D — трёхуровневая: ``<case_id>`` (постановка, напр. ``FT2``)
 содержит прогоны ``<stamp>`` (timestamp, напр. ``2026-09-23_21-58-05``)::
@@ -10,9 +18,7 @@
     <root>/wave2d/<case_id>/<stamp>/tasks/<task>/results.h5
     <root>/wave2d/<case_id>/results.h5                    # legacy-плоско
 
-Кейсы не хардкодятся — они дискаверятся по файловой системе. Пока реализована
-только часть Wave2D; ELMFIRE и ``derived`` живут в :mod:`src.common.paths`
-(см. ``TODO.md``).
+Кейсы не хардкодятся — они дискаверятся по файловой системе.
 """
 
 from __future__ import annotations
@@ -36,6 +42,12 @@ def data_root() -> Path:
     return _REPO_ROOT / "data"
 
 
+def _resolve_root(root: str | Path | None) -> Path:
+    if root is not None:
+        return Path(root).expanduser().resolve()
+    return data_root()
+
+
 def split_run_id(run_id: str) -> tuple[str, str | None]:
     """Разбирает ссылку на прогон.
 
@@ -53,10 +65,23 @@ def split_run_id(run_id: str) -> tuple[str, str | None]:
     )
 
 
-# --- Wave2D ---------------------------------------------------------------
+# --- база ----------------------------------------------------------------
 
 class Navigator:
-    """Навигатор по каталогу Wave2D. Корень задаётся при создании.
+    """База навигатора: общий корень данных и склейка путей."""
+
+    def __init__(self, root: str | Path | None = None) -> None:
+        self.root = _resolve_root(root)
+
+    def path(self, *parts: str) -> Path:
+        """Путь относительно корня данных."""
+        return self.root.joinpath(*parts)
+
+
+# --- Wave2D ---------------------------------------------------------------
+
+class Wave2DNavigator(Navigator):
+    """Навигатор по каталогу Wave2D.
 
     Кейсы (``case_id``) — подкаталоги ``<root>/wave2d``; они не хардкодятся,
     а дискаверятся по файловой системе. Прогон внутри кейса задаётся либо
@@ -64,16 +89,9 @@ class Navigator:
     ``"<case_id>/<stamp>"``.
     """
 
-    def __init__(self, root: str | Path | None = None) -> None:
-        self.root = (
-            Path(root).expanduser().resolve()
-            if root is not None
-            else data_root()
-        )
-
     def wave2d_root(self) -> Path:
         """Корень данных Wave2D: ``<root>/wave2d``."""
-        return self.root / "wave2d"
+        return self.path("wave2d")
 
     def cases(self) -> list[str]:
         """Список кейсов = подкаталогов ``wave2d`` (каждый — постановка)."""
@@ -142,38 +160,94 @@ class Navigator:
         return runs
 
 
-def default_navigator() -> Navigator:
-    """Navigator для корня по умолчанию (``WAVE2D_DATA_DIR`` или ``<repo>/data``)."""
-    return Navigator()
+# --- ELMFIRE (заглушка) ---------------------------------------------------
+
+class ElmfireNavigator(Navigator):
+    """Навигатор по каталогу ELMFIRE — заглушка.
+
+    Методы ещё не перенесены из :mod:`src.common.paths` (см. ``TODO.md``).
+    """
+
+    def raw(self, run_id: str) -> Path:
+        raise NotImplementedError("ElmfireNavigator.raw: см. TODO.md")
+
+    def converted(self, run_id: str, name: str = "z1.h5") -> Path:
+        raise NotImplementedError("ElmfireNavigator.converted: см. TODO.md")
+
+
+# --- derived (заглушка) ---------------------------------------------------
+
+class DerivedNavigator(Navigator):
+    """Навигатор по ``derived/`` — заглушка.
+
+    Методы ещё не перенесены из :mod:`src.common.paths` (см. ``TODO.md``).
+    """
+
+    def plots(self, run_id: str | None = None) -> Path:
+        raise NotImplementedError("DerivedNavigator.plots: см. TODO.md")
+
+    def frames(self, run_id: str) -> Path:
+        raise NotImplementedError("DerivedNavigator.frames: см. TODO.md")
+
+    def video(self) -> Path:
+        raise NotImplementedError("DerivedNavigator.video: см. TODO.md")
+
+    def coupling(self, *parts: str) -> Path:
+        raise NotImplementedError("DerivedNavigator.coupling: см. TODO.md")
+
+
+# --- фасад ----------------------------------------------------------------
+
+class DataNavigator(Navigator):
+    """Фасад: одна точка входа для всех слоёв данных.
+
+    Пример::
+
+        nav = DataNavigator()
+        nav.wave2d.latest("FT2")
+        nav.elmfire.raw("WagD")        # пока NotImplementedError (TODO)
+        nav.derived.plots("Globus")    # пока NotImplementedError (TODO)
+    """
+
+    def __init__(self, root: str | Path | None = None) -> None:
+        super().__init__(root)
+        self.wave2d = Wave2DNavigator(self.root)
+        self.elmfire = ElmfireNavigator(self.root)
+        self.derived = DerivedNavigator(self.root)
+
+
+def default_navigator() -> DataNavigator:
+    """Фасад для корня по умолчанию (``WAVE2D_DATA_DIR`` или ``<repo>/data``)."""
+    return DataNavigator()
 
 
 def wave2d_dir(run_id: str) -> Path:
-    """Каталог прогона (обёртка над :meth:`Navigator.run_dir`)."""
-    return default_navigator().run_dir(run_id)
+    """Каталог прогона (обёртка над :meth:`Wave2DNavigator.run_dir`)."""
+    return default_navigator().wave2d.run_dir(run_id)
 
 
 def wave2d_results(run_id: str, name: str = "results.h5") -> Path:
-    """Общий файл прогона (обёртка над :meth:`Navigator.results`)."""
-    return default_navigator().results(run_id, name)
+    """Общий файл прогона (обёртка над :meth:`Wave2DNavigator.results`)."""
+    return default_navigator().wave2d.results(run_id, name)
 
 
 def wave2d_task_results(
     run_id: str, task: str, name: str = "results.h5"
 ) -> Path:
-    """Файл задачи (обёртка над :meth:`Navigator.task_results`)."""
-    return default_navigator().task_results(run_id, task, name)
+    """Файл задачи (обёртка над :meth:`Wave2DNavigator.task_results`)."""
+    return default_navigator().wave2d.task_results(run_id, task, name)
 
 
 def wave2d_cases() -> list[str]:
-    """Все кейсы (обёртка над :meth:`Navigator.cases`)."""
-    return default_navigator().cases()
+    """Все кейсы (обёртка над :meth:`Wave2DNavigator.cases`)."""
+    return default_navigator().wave2d.cases()
 
 
 def wave2d_runs(case_id: str | None = None) -> list[str]:
-    """Все прогоны (обёртка над :meth:`Navigator.runs`)."""
-    return default_navigator().runs(case_id)
+    """Все прогоны (обёртка над :meth:`Wave2DNavigator.runs`)."""
+    return default_navigator().wave2d.runs(case_id)
 
 
 def wave2d_latest(case_id: str) -> str:
-    """Свежий прогон кейса (обёртка над :meth:`Navigator.latest`)."""
-    return default_navigator().latest(case_id)
+    """Свежий прогон кейса (обёртка над :meth:`Wave2DNavigator.latest`)."""
+    return default_navigator().wave2d.latest(case_id)

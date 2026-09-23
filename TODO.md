@@ -101,10 +101,13 @@ data/                              # корень = WAVE2D_DATA_DIR (по умо
       `plots_2d/` → `derived/frames/WagD/`.
 - [x] **(P2) Разделить source и derived:** PNG/MP4/интегралы — только в `derived/`.
 - [x] **(P3) Автосоздание структуры `data/`** — реализовано `paths.ensure_data_root()`.
-- [x] **(P1) `Navigator` для Wave2D** — вынесен в `src/common/navigator.py`;
-      корень задаётся при создании, кейсы (`wave2d/<case_id>`) дискаверятся по ФС,
-      прогон = `<case_id>/<stamp>`; legacy-плоско (`Globus/results.h5`) поддержано.
-      Модульные обёртки сохранены, `paths.py` реэкспортирует `Navigator`.
+- [x] **(P1) `Navigator` для Wave2D** — вынесен в `src/common/navigator.py`.
+      База `Navigator` (корень + `path()`); `Wave2DNavigator` — рабочий;
+      `ElmfireNavigator`/`DerivedNavigator` — заглушки (`NotImplementedError`);
+      `DataNavigator` — фасад (`nav.wave2d/elmfire/derived`). Корень задаётся
+      при создании, кейсы дискаверятся по ФС, прогон = `<case_id>/<stamp>`;
+      legacy-плоско (`Globus/results.h5`) поддержано. Обёртки `wave2d_*`
+      сохранены, `paths.py` реэкспортирует навигаторы.
 - [ ] **(P1) Перенести ELMFIRE и `derived` в `Navigator`** (сейчас — модульные функции).
 - [ ] **(P1) CLI: `run_id = <case_id>/<stamp>` и `--latest`** в `main.py`;
       убрать хардкод `wave2d_results("Globus")` из `integrator.py`/`integrator_test_pi.py`.

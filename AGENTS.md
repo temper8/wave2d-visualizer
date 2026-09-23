@@ -57,7 +57,7 @@ uv run make_video.py          # plots_2d/*.png -> fluctuations_evolution.mp4
 
 ```
 src/
-├── common/navigator.py      # Navigator — навигация по Wave2D (case_id/<stamp>)
+├── common/navigator.py      # Navigator + Wave2D/Elmfire/Derived/Data навигаторы
 ├── common/paths.py          # доступ к данным: реэкспорт Navigator + ELMFIRE/derived
 ├── utils.py                 # чтение HDF5, view2d/view_complex_2d, plot_polar_2d
 ├── integrate.py             # integrate_on_custom_grid() — интеграл перекрытия
@@ -111,9 +111,10 @@ data/
 - Wave2D: кейсы (`case_id`: `Globus`, `FT2`, ...) — подкаталоги `data/wave2d/`;
   внутри кейса — прогоны `<stamp>` (`FT2/<stamp>/`). Legacy-плоско
   (`Globus/results.h5`) поддержано. Список кейсов не хардкодится — дискавери и
-  пути даёт `navigator.Navigator` (`cases()`, `runs()`, `latest()`, `results()`,
-  `task_results()`); он реэкспортируется из `paths.py`, совместимые обёртки
-  `wave2d_*` сохранены.
+  пути даёт `navigator.DataNavigator` (фасад): `nav.wave2d.cases()/runs()/
+  latest()/results()/task_results()`. База — `Navigator` (корень + `path()`),
+  `Wave2DNavigator` — реализован, `ElmfireNavigator`/`DerivedNavigator` — заглушки
+  (см. `TODO.md`). Всё реэкспортируется из `paths.py`, обёртки `wave2d_*` сохранены.
 - ELMFIRE: `WagD`.
 - Скрипты пока вызывают `wave2d_results(run_id)` со старым `run_id`; переход на
   `run_id = "<case_id>/<stamp>"` и флаг `--latest` — в `TODO.md`.

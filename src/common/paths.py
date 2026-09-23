@@ -25,7 +25,11 @@ from pathlib import Path
 
 # Реэкспорт Wave2D-навигации: раньше всё это было в текущем модуле.
 from src.common.navigator import (  # noqa: F401
+    DataNavigator,
+    DerivedNavigator,
+    ElmfireNavigator,
     Navigator,
+    Wave2DNavigator,
     data_root,
     default_navigator,
     split_run_id,
@@ -39,6 +43,10 @@ from src.common.navigator import (  # noqa: F401
 
 __all__ = [
     "Navigator",
+    "Wave2DNavigator",
+    "ElmfireNavigator",
+    "DerivedNavigator",
+    "DataNavigator",
     "data_root",
     "default_navigator",
     "split_run_id",
