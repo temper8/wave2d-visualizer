@@ -45,6 +45,9 @@ class W2DViewer:
 
         self.setup_ui()
         self.populate_tree()
+        # Начальная ширина левой панели ~400 px (после первой раскладки окна).
+        self._sash_done = False
+        self.paned.bind("<Configure>", self._set_initial_sash, add="+")
 
     # --- данные ----------------------------------------------------------
 
@@ -64,7 +67,7 @@ class W2DViewer:
             self.root, text=f"Файл: {self.file_path}", anchor="w"
         ).pack(fill=tk.X, padx=6, pady=3)
 
-        paned = ttk.Panedwindow(self.root, orient=tk.HORIZONTAL)
+        paned = self.paned = ttk.Panedwindow(self.root, orient=tk.HORIZONTAL)
         paned.pack(fill=tk.BOTH, expand=True)
 
         # --- левая часть: дерево + атрибуты ---
@@ -116,6 +119,16 @@ class W2DViewer:
 
         paned.add(left, weight=1)
         paned.add(right, weight=3)
+
+    def _set_initial_sash(self, event=None) -> None:
+        """Однократно задаёт начальную позицию разделителя: левая панель ~400 px."""
+        if self._sash_done:
+            return
+        try:
+            self.paned.sashpos(0, 400)
+        except tk.TclError:
+            return  # окно ещё не готово — попробуем на следующем <Configure>
+        self._sash_done = True
 
     def populate_tree(self) -> None:
         """Строит дерево содержимого файла через :meth:`H5Reader.walk`."""
