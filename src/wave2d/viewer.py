@@ -45,7 +45,7 @@ class W2DViewer:
 
         self.setup_ui()
         self.populate_tree()
-        # Начальная ширина левой панели ~400 px (после первой раскладки окна).
+        # Начальная ширина левой панели ~300 px (после первой раскладки окна).
         self._sash_done = False
         self.paned.bind("<Configure>", self._set_initial_sash, add="+")
 
@@ -121,11 +121,11 @@ class W2DViewer:
         paned.add(right, weight=3)
 
     def _set_initial_sash(self, event=None) -> None:
-        """Однократно задаёт начальную позицию разделителя: левая панель ~400 px."""
+        """Однократно задаёт начальную позицию разделителя: левая панель ~300 px."""
         if self._sash_done:
             return
         try:
-            self.paned.sashpos(0, 400)
+            self.paned.sashpos(0, 300)
         except tk.TclError:
             return  # окно ещё не готово — попробуем на следующем <Configure>
         self._sash_done = True
