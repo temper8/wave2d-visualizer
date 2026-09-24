@@ -67,6 +67,7 @@ wave2d-visualizer/
 ├── integrator.py                # пример интегрирования по кадру флуктуаций
 ├── integrator_test_pi.py        # тест интегрирования на единичных полях
 ├── make_video.py                # сборка PNG -> fluctuations_evolution.mp4
+├── run_w2d_app.bat              # Windows-лаунчер: w2d_app.py через uv
 ├── pyproject.toml
 └── uv.lock
 ```
@@ -141,6 +142,12 @@ uv run w2d_render.py FT2/2026-09-23_21-58-05  # конкретный прого�
 uv run w2d_app.py        # навигатор по прогонам -> открыть viewer
 uv run w2d_viewer.py     # viewer для свежего прогона FT2
 ```
+
+На Windows навигатор можно запустить без терминала — двойным кликом по
+`run_w2d_app.bat` (или из консоли `run_w2d_app.bat [<data_root>]`). Скрипт —
+лишь обёртка над `uv run w2d_app.py`: запуск идёт только через `uv`, аргумент
+`<data_root>` пробрасывается, а если `uv` не найден в `PATH` — bat сообщит об
+этом и подскажет команду установки.
 
 ### 4. Интерактивный просмотр флуктуаций
 
