@@ -14,7 +14,7 @@ echo [ERROR] uv was not found in PATH.
 echo.
 echo Install uv, then run this script again. Options:
 echo   winget install --id astral-sh.uv -e
-echo   powershell -c "irm https://astral.sh/uv/install.ps1 ^| iex"
+echo   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 echo.
 echo After install reopen the terminal so PATH is refreshed.
 pause
