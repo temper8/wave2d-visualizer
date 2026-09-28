@@ -18,7 +18,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 import tkinter as tk
 from tkinter import ttk
 
-from src.common.h5reader import H5Reader
+from src.wave2d.schema import GRID_X, GRID_Y, open_results
 
 
 class W2DViewer:
@@ -29,7 +29,8 @@ class W2DViewer:
         self.file_path = file_path
 
         # Одно соединение на всё время работы, закрывается в on_closing.
-        self.reader = H5Reader(file_path).open()
+        # open_results заодно проверяет версию схемы (>= 0.94).
+        self.reader = open_results(file_path)
 
         self.R = None
         self.Z = None
@@ -54,9 +55,9 @@ class W2DViewer:
     def _load_coords(self) -> None:
         """Координаты (R,Z) для физического вида, если есть в файле."""
         try:
-            if self.reader.contains("/coord/X") and self.reader.contains("/coord/Y"):
-                self.R = self.reader.array("/coord/X")
-                self.Z = self.reader.array("/coord/Y")
+            if self.reader.contains(GRID_X) and self.reader.contains(GRID_Y):
+                self.R = self.reader.array(GRID_X)
+                self.Z = self.reader.array(GRID_Y)
         except Exception:
             self.R = self.Z = None
 

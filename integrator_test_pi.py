@@ -2,10 +2,16 @@ import h5py
 from scipy.interpolate import RegularGridInterpolator
 import numpy as np
 
-from src.common.paths import elmfire_converted, wave2d_results
+from src.common.paths import elmfire_converted, wave2d_latest, wave2d_results
 from src.integrate import integrate_on_custom_grid
 from src.interpolator import get_interpolator, get_periodic_interpolator
 from src.utils import dataset_reader, get_attributes_recursive_from
+from src.wave2d.schema import (
+    GRID_RHO,
+    INPUT_W2GRID,
+    ensure_supported_path,
+    field_dataset,
+)
 
 
 
@@ -19,18 +25,21 @@ with h5py.File(str(elmfire_converted("WagD")), 'r') as f:
 
 # Считываем данные функции поля со своей независимой геометрией
 
-file_path = str(wave2d_results("Globus"))
+run_id = wave2d_latest("FT-2_LH_smoke_nphi")
+file_path = str(wave2d_results(run_id))
 
-run_params = get_attributes_recursive_from(file_path, start_path='/run_params')
+# Только новый формат: старая схема будет отклонена с сообщением.
+ensure_supported_path(file_path)
+
+run_params = get_attributes_recursive_from(file_path, start_path=INPUT_W2GRID)
 #print_dict(run_params)    
-nphi = run_params['w2grid']['nphi1']
-nphi = f"nphi-{abs(nphi):03d}" if nphi < 0 else f"nphi{nphi:03d}"
+nphi = int(run_params[INPUT_W2GRID]['nphi1'])
 print(nphi)
-Ea_field = dataset_reader(file_path, f'/{nphi}/field_2d/Ea')
+Ea_field = dataset_reader(file_path, field_dataset(nphi, "Ea"))
 field_max_rho, field_max_theta = Ea_field.shape
 print(field_max_rho, field_max_theta)
-field_rho = dataset_reader(file_path, '/coord/rho')
-field_rho= field_rho[0:field_max_rho]
+field_rho = dataset_reader(file_path, GRID_RHO)
+field_rho = field_rho[0:field_max_rho]
 
 # инициализация массивов 1 для проверки интегрирования
 f_mat[:,:] = 1.0

@@ -3,7 +3,7 @@
 Дерево строится динамически по файловой системе через
 :class:`~src.common.navigator.Wave2DNavigator` (кейсы → прогоны → задачи),
 в листьях — реальные ``results.h5``. Выбор листа показывает сводку
-``run_info``/``run_params``; кнопка (или двойной клик) открывает
+``manifest``/``input``; кнопка (или двойной клик) открывает
 :class:`~src.wave2d.viewer.W2DViewer` в отдельном окне ``Toplevel``.
 
 Точка входа — ``w2d_app.py`` в корне репозитория.
@@ -12,11 +12,12 @@
 from pathlib import Path
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 from src.common.h5reader import H5Reader
 from src.common.navigator import Wave2DNavigator
 from src.common.paths import data_root
+from src.wave2d.schema import UnsupportedFormatError
 
 from src.wave2d.viewer import W2DViewer
 
@@ -140,7 +141,10 @@ class W2DNavigatorApp:
             self._open_viewer(self.selected)
 
     def _open_viewer(self, path: Path) -> None:
-        W2DViewer(tk.Toplevel(self.root), str(path))
+        try:
+            W2DViewer(tk.Toplevel(self.root), str(path))
+        except UnsupportedFormatError as e:
+            messagebox.showerror("Формат не поддерживается", str(e), parent=self.root)
 
     # --- инфо-панель -----------------------------------------------------
 
@@ -149,15 +153,15 @@ class W2DNavigatorApp:
         lines = [f"Файл  : {path}", f"Размер: {size_mb:.2f} MB", ""]
         try:
             with H5Reader(path) as reader:
-                if reader.contains("/run_info"):
-                    run_info = reader.run_info()
-                    if run_info:
-                        lines.append("run_info:")
-                        lines.extend(self._format_params(run_info, "/run_info"))
+                if reader.contains("/manifest"):
+                    manifest = reader.manifest()
+                    if manifest:
+                        lines.append("manifest:")
+                        lines.extend(self._format_params(manifest, "/manifest"))
                         lines.append("")
-                if reader.contains("/run_params"):
-                    lines.append("run_params:")
-                    lines.extend(self._format_params(reader.params(), "/run_params"))
+                if reader.contains("/input"):
+                    lines.append("input:")
+                    lines.extend(self._format_params(reader.params(), "/input"))
         except Exception as e:  # noqa: BLE001
             lines.append(f"(не удалось прочитать параметры: {e})")
         self._set_info("\n".join(lines))

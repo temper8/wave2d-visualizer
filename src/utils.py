@@ -98,18 +98,27 @@ def plot_polar_2d(r, phi, Z, title="2D Полярный график", cmap="vir
 import matplotlib.pyplot as plt
 # Дальнейшая работа с data_array...
 if __name__ == '__main__':
-    from src.common.paths import wave2d_results
-    # Укажите путь к вашему HDF5 файлу
-    file_path = str(wave2d_results("FT2"))
+    from src.common.paths import wave2d_latest, wave2d_results
+    from src.wave2d.schema import (
+        GRID_X,
+        GRID_Y,
+        INPUT,
+        MANIFEST,
+        field_dataset,
+    )
 
-    run_info = get_attributes_recursive_from(file_path, start_path='/run_info')
-    print_dict(run_info)
-    run_params = get_attributes_recursive_from(file_path, start_path='/run_params')
+    # Укажите путь к вашему HDF5 файлу
+    run_id = wave2d_latest("FT-2_LH_smoke_nphi")
+    file_path = str(wave2d_results(run_id))
+
+    manifest = get_attributes_recursive_from(file_path, start_path=MANIFEST)
+    print_dict(manifest)
+    run_params = get_attributes_recursive_from(file_path, start_path=INPUT)
     print_dict(run_params)
 
-    dataset_name = '/coord/R'  # Имя 3D массива внутри файла
-    R = dataset_reader(file_path, '/coord/X')
-    Z = dataset_reader(file_path, '/coord/Y')
-    data_2d = dataset_reader(file_path, '/nphi-122/field_2d/Ea')
+    nphi = int(get_dataset_attributes(file_path, INPUT + "/w2grid")["nphi1"])
+    R = dataset_reader(file_path, GRID_X)
+    Z = dataset_reader(file_path, GRID_Y)
+    data_2d = dataset_reader(file_path, field_dataset(nphi, "Ea"))
     view2d(R, Z, data_2d, "Ea field")
     print("\nДанные успешно загружены в переменную 'data_array'")

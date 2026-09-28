@@ -5,9 +5,9 @@
     from src.common.h5reader import H5Reader
 
     with H5Reader("results.h5") as r:
-        params = r.params()                        # /run_params
-        X = r.array("/coord/X")                     # np.ndarray (копия)
-        dset = r.dataset("/nphi+122/field_2D/Ea")   # h5py.Dataset (лениво)
+        params = r.params()                        # /input
+        X = r.array("/grid/X")                     # np.ndarray (копия)
+        dset = r.dataset("/fields/nphi+122/Ea")    # h5py.Dataset (лениво)
 
 Класс общий (не завязан на Wave2D/ELMFIRE): доменные обёртки вроде
 ``Wave2DResults`` можно надстроить позже — см. ``TODO.md``.
@@ -155,13 +155,13 @@ class H5Reader:
             start_obj.visititems(visitor)
         return result
 
-    def params(self, start_path: str = "/run_params") -> dict[str, dict[str, Any]]:
-        """Атрибуты ``/run_params`` (рекурсивно)."""
+    def params(self, start_path: str = "/input") -> dict[str, dict[str, Any]]:
+        """Атрибуты ``/input`` (рекурсивно) — входные параметры Wave2D."""
         return self.attrs_recursive(start_path)
 
-    def run_info(self) -> dict[str, dict[str, Any]]:
-        """Атрибуты ``/run_info`` (рекурсивно)."""
-        return self.attrs_recursive("/run_info")
+    def manifest(self) -> dict[str, dict[str, Any]]:
+        """Атрибуты ``/manifest`` (рекурсивно) — провенанс запуска."""
+        return self.attrs_recursive("/manifest")
 
     # --- служебное -------------------------------------------------------
 
