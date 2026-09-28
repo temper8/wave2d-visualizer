@@ -17,7 +17,7 @@ from tkinter import messagebox, ttk
 from src.common.h5reader import H5Reader
 from src.common.navigator import Wave2DNavigator
 from src.common.paths import data_root
-from src.wave2d.schema import UnsupportedFormatError
+from src.wave2d.schema import UnsupportedFormatError, ensure_supported_path
 
 from src.wave2d.viewer import W2DViewer
 
@@ -141,10 +141,14 @@ class W2DNavigatorApp:
             self._open_viewer(self.selected)
 
     def _open_viewer(self, path: Path) -> None:
+        # Проверяем версию до создания окна: иначе при несовместимом
+        # формате останется пустой Toplevel.
         try:
-            W2DViewer(tk.Toplevel(self.root), str(path))
+            ensure_supported_path(path)
         except UnsupportedFormatError as e:
             messagebox.showerror("Формат не поддерживается", str(e), parent=self.root)
+            return
+        W2DViewer(tk.Toplevel(self.root), str(path))
 
     # --- инфо-панель -----------------------------------------------------
 
