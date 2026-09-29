@@ -52,7 +52,7 @@ uv run w2d_viewer.py          # GUI: дерево results.h5 + изображе�
 uv run w2d_app.py             # GUI: выбор прогона Wave2D -> открыть w2d_viewer
 uv run elmfire_viewer.py      # GUI просмотра флуктуаций
 uv run integrator.py          # интеграл перекрытия
-uv run make_video.py          # derived/frames/*.png -> fluctuations_evolution.mp4
+uv run elmfire_video.py       # derived/frames/*.png -> fluctuations_evolution.mp4
 ```
 
 ## Карта репозитория
@@ -71,6 +71,7 @@ src/
 │   └── app.py               # W2DNavigatorApp — GUI-навигатор по прогонам
 └── elmfire/
     ├── convert.py           # convert_raw_to_h5 — ELMFIRE .dat -> z1.h5
+    ├── video.py             # make_fluctuations_video — кадры -> MP4
     └── viewer.py            # ElmfireFluctuationsViewer — просмотр z1.h5
 elmfire_convert.py           # точка входа конвертации ELMFIRE .dat -> z1.h5
 tools/elmfire_reader.py      # инспекция .dat + рендер кадров в derived/frames
@@ -81,7 +82,7 @@ w2d_app.py                   # точка входа GUI-навигатора (�
 elmfire_viewer.py            # точка входа GUI-просмотрщика флуктуаций (src/elmfire/)
 integrator.py                # пример интеграла перекрытия
 integrator_test_pi.py        # проверка на единичных полях
-make_video.py                # сборка видео
+elmfire_video.py             # сборка видео
 ```
 
 ## Где лежат данные

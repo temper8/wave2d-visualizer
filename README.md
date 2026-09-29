@@ -49,6 +49,7 @@ wave2d-visualizer/
 │   ├── wave2d/viewer.py         # W2DViewer — просмотр results.h5
 │   ├── wave2d/app.py            # W2DNavigatorApp — GUI-навигатор по прогонам
 │   ├── elmfire/convert.py       # convert_raw_to_h5 — .dat -> z1.h5
+│   ├── elmfire/video.py         # make_fluctuations_video — кадры -> MP4
 │   ├── elmfire/viewer.py        # ElmfireFluctuationsViewer — просмотр z1.h5
 │   ├── utils.py                 # чтение HDF5, 2D-визуализация полей, вывод атрибутов
 │   ├── integrate.py             # интеграл произведения флуктуаций и поля
@@ -68,7 +69,7 @@ wave2d-visualizer/
 ├── elmfire_viewer.py            # точка входа: GUI-просмотрщик флуктуаций (z1.h5)
 ├── integrator.py                # пример интегрирования по кадру флуктуаций
 ├── integrator_test_pi.py        # тест интегрирования на единичных полях
-├── make_video.py                # сборка PNG -> fluctuations_evolution.mp4
+├── elmfire_video.py             # сборка PNG -> fluctuations_evolution.mp4
 ├── run_w2d_app.bat              # Windows-лаунчер: w2d_app.py через uv
 ├── pyproject.toml
 └── uv.lock
@@ -176,7 +177,7 @@ uv run integrator_test_pi.py  # проверка на единичных пол�
 `data/derived/video/fluctuations_evolution.mp4` (fps=15):
 
 ```bash
-uv run make_video.py WagD
+uv run elmfire_video.py WagD
 ```
 
 ## 🧮 Формат HDF5 (`z1.h5`)
