@@ -63,7 +63,6 @@ wave2d-visualizer/
 ├── w2d_app.py                   # точка входа: GUI-навигатор по прогонам
 ├── w2d_viewer.py                # точка входа: GUI-просмотрщик датасета
 ├── app_tk.py                    # GUI: просмотр флуктуаций (Tkinter + Matplotlib)
-├── app_vis_fluct_tk.py          # GUI-дубликат app_tk.py
 ├── integrator.py                # пример интегрирования по кадру флуктуаций
 ├── integrator_test_pi.py        # тест интегрирования на единичных полях
 ├── make_video.py                # сборка PNG -> fluctuations_evolution.mp4
