@@ -48,7 +48,9 @@ class H5Reader:
     def open(self) -> "H5Reader":
         """Открывает файл (если ещё не открыт) и возвращает ``self``."""
         if self._file is None:
-            self._file = h5py.File(self.path, self.mode)
+            # Блокировка HDF5 не работает на сетевых путях (WSL UNC, SMB),
+            # поэтому для чтения она выключается (для записи — остаётся).
+            self._file = h5py.File(self.path, self.mode, locking=self.mode != "r")
             if self.verbose:
                 print(f"Открыт файл: {self.path}")
         return self
