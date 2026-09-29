@@ -6,9 +6,10 @@ Windows — ``%APPDATA%\\wave2d-visualizer\\settings.json``,
 ``~/.config/wave2d-visualizer/settings.json``. В репозиторий и ``data/``
 ничего не пишется.
 
-Пока единственная настройка — последняя открытая папка данных
-(``last_data_root``), которую использует
-:class:`~src.wave2d.app.W2DNavigatorApp`.
+Хранит последнюю открытую папку **каждого навигатора** (``wave2d``,
+``elmfire``, ``derived``) — у каждого слоя данных своя папка. Общий корень
+(``WAVE2D_DATA_DIR``) используется только как значение по умолчанию, пока
+настройка не задана (условный «первый запуск»).
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ from pathlib import Path
 _APP_NAME = "wave2d-visualizer"
 _SETTINGS_NAME = "settings.json"
 
-LAST_DATA_ROOT = "last_data_root"
+_NAVIGATOR_ROOTS = "navigator_roots"
 
 
 def config_dir() -> Path:
@@ -60,16 +61,23 @@ def save_settings(values: dict) -> None:
     )
 
 
-def get_last_data_root() -> Path | None:
-    """Последняя открытая папка данных или ``None``, если её нет."""
-    value = load_settings().get(LAST_DATA_ROOT)
+def get_navigator_root(name: str) -> Path | None:
+    """Последняя открытая папка навигатора ``name`` или ``None``."""
+    roots = load_settings().get(_NAVIGATOR_ROOTS)
+    if not isinstance(roots, dict):
+        return None
+    value = roots.get(name)
     if isinstance(value, str) and value:
         return Path(value).expanduser()
     return None
 
 
-def set_last_data_root(path: str | Path) -> None:
-    """Запоминает папку данных как последнюю открытую."""
+def set_navigator_root(name: str, path: str | Path) -> None:
+    """Запоминает папку навигатора ``name``."""
     data = load_settings()
-    data[LAST_DATA_ROOT] = str(Path(path).expanduser().resolve())
+    roots = data.get(_NAVIGATOR_ROOTS)
+    if not isinstance(roots, dict):
+        roots = {}
+    roots[name] = str(Path(path).expanduser().resolve())
+    data[_NAVIGATOR_ROOTS] = roots
     save_settings(data)

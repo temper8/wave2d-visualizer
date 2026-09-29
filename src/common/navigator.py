@@ -1,22 +1,26 @@
 """Навигация по каталогу данных.
 
-Корень данных задаётся при создании навигатора; по умолчанию берётся из
-переменной окружения ``WAVE2D_DATA_DIR`` или ``<repo>/data``.
+У каждого навигатора — **своя** папка (слой данных): ``wave2d``, ``elmfire``,
+``derived``. Папка задаётся при создании; если не задана, берётся сохранённая
+настройка (:func:`src.common.settings.get_navigator_root`), а при её
+отсутствии — дефолт ``data_root()/<SUBDIR>``. Общий корень ``data_root()``
+(``WAVE2D_DATA_DIR`` или ``<repo>/data``) используется тем самым только «на
+первом запуске», пока нет настроек.
 
 Иерархия классов::
 
-    Navigator              # база: общий корень + path()
-    ├── Wave2DNavigator    # wave2d/<case_id>[/<stamp>]/...
+    Navigator              # база: собственная папка слоя + path()
+    ├── Wave2DNavigator    # <wave2d>/<case_id>[/<stamp>]/...
     ├── ElmfireNavigator   # заглушка (TODO)
-    ├── DerivedNavigator   # заглушка (TODO)
-    └── DataNavigator      # фасад: nav.wave2d / nav.elmfire / nav.derived
+    └── DerivedNavigator   # заглушка (TODO)
+    DataNavigator          # фасад: nav.wave2d / nav.elmfire / nav.derived
 
 Раскладка Wave2D — трёхуровневая: ``<case_id>`` (постановка, напр. ``FT2``)
 содержит прогоны ``<stamp>`` (timestamp, напр. ``2026-09-23_21-58-05``)::
 
-    <root>/wave2d/<case_id>/<stamp>/results.h5            # общий файл серии
-    <root>/wave2d/<case_id>/<stamp>/tasks/<task>/results.h5
-    <root>/wave2d/<case_id>/results.h5                    # legacy-плоско
+    <wave2d>/<case_id>/<stamp>/results.h5            # общий файл серии
+    <wave2d>/<case_id>/<stamp>/tasks/<task>/results.h5
+    <wave2d>/<case_id>/results.h5                    # legacy-плоско
 
 Кейсы не хардкодятся — они дискаверятся по файловой системе.
 """
@@ -26,6 +30,8 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
+
+from src.common.settings import get_navigator_root
 
 # Корень репозитория: <repo>/src/common/navigator.py -> parents[2] == <repo>
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -68,13 +74,30 @@ def split_run_id(run_id: str) -> tuple[str, str | None]:
 # --- база ----------------------------------------------------------------
 
 class Navigator:
-    """База навигатора: общий корень данных и склейка путей."""
+    """База навигатора: собственная папка слоя данных и склейка путей.
+
+    ``root`` — папка самого навигатора (напр. ``<data>/wave2d``). Если не
+    задана, берётся сохранённая настройка
+    :func:`~src.common.settings.get_navigator_root`, а при её отсутствии —
+    дефолт ``data_root()/<SUBDIR>``. Подклассы задают ``NAME`` и ``SUBDIR``.
+    """
+
+    NAME: str = ""
+    SUBDIR: str = ""
 
     def __init__(self, root: str | Path | None = None) -> None:
-        self.root = _resolve_root(root)
+        self.root = self._resolve(root)
+
+    def _resolve(self, root: str | Path | None) -> Path:
+        if root is not None:
+            return _resolve_root(root)
+        saved = get_navigator_root(self.NAME) if self.NAME else None
+        if saved is not None and saved.is_dir():
+            return _resolve_root(saved)
+        return data_root() / self.SUBDIR if self.SUBDIR else data_root()
 
     def path(self, *parts: str) -> Path:
-        """Путь относительно корня данных."""
+        """Путь относительно папки навигатора."""
         return self.root.joinpath(*parts)
 
 
@@ -83,26 +106,29 @@ class Navigator:
 class Wave2DNavigator(Navigator):
     """Навигатор по каталогу Wave2D.
 
-    Кейсы (``case_id``) — подкаталоги ``<root>/wave2d``; они не хардкодятся,
+    Кейсы (``case_id``) — подкаталоги своей папки; они не хардкодятся,
     а дискаверятся по файловой системе. Прогон внутри кейса задаётся либо
     как ``"<case_id>"`` (legacy, ``results.h5`` лежит прямо в кейсе), либо как
     ``"<case_id>/<stamp>"``.
     """
 
+    NAME = "wave2d"
+    SUBDIR = "wave2d"
+
     def wave2d_root(self) -> Path:
-        """Корень данных Wave2D: ``<root>/wave2d``."""
-        return self.path("wave2d")
+        """Папка Wave2D — собственная папка навигатора."""
+        return self.root
 
     def cases(self) -> list[str]:
-        """Список кейсов = подкаталогов ``wave2d`` (каждый — постановка)."""
-        root = self.wave2d_root()
+        """Список кейсов = подкаталогов папки Wave2D (каждый — постановка)."""
+        root = self.root
         if not root.is_dir():
             return []
         return sorted(p.name for p in root.iterdir() if p.is_dir())
 
     def case_dir(self, case_id: str) -> Path:
-        """Каталог кейса: ``wave2d/<case_id>``."""
-        return self.wave2d_root() / case_id
+        """Каталог кейса: ``<root>/<case_id>``."""
+        return self.root / case_id
 
     def run_dir(self, run_id: str) -> Path:
         """Каталог прогона: ``wave2d/<case_id>[/<stamp>]``."""
@@ -175,6 +201,9 @@ class ElmfireNavigator(Navigator):
     Методы ещё не перенесены из :mod:`src.common.paths` (см. ``TODO.md``).
     """
 
+    NAME = "elmfire"
+    SUBDIR = "elmfire"
+
     def raw(self, run_id: str) -> Path:
         raise NotImplementedError("ElmfireNavigator.raw: см. TODO.md")
 
@@ -189,6 +218,9 @@ class DerivedNavigator(Navigator):
 
     Методы ещё не перенесены из :mod:`src.common.paths` (см. ``TODO.md``).
     """
+
+    NAME = "derived"
+    SUBDIR = "derived"
 
     def plots(self, run_id: str | None = None) -> Path:
         raise NotImplementedError("DerivedNavigator.plots: см. TODO.md")
@@ -205,8 +237,13 @@ class DerivedNavigator(Navigator):
 
 # --- фасад ----------------------------------------------------------------
 
-class DataNavigator(Navigator):
+class DataNavigator:
     """Фасад: одна точка входа для всех слоёв данных.
+
+    У каждого под-навигатора **своя** папка. Необязательный ``root`` — общий
+    корень, используемый только чтобы вывести папки по умолчанию (условный
+    «первый запуск»). При ``root=None`` каждый навигатор берёт свою папку из
+    настроек или дефолт ``data_root()/<SUBDIR>``.
 
     Пример::
 
@@ -217,14 +254,14 @@ class DataNavigator(Navigator):
     """
 
     def __init__(self, root: str | Path | None = None) -> None:
-        super().__init__(root)
-        self.wave2d = Wave2DNavigator(self.root)
-        self.elmfire = ElmfireNavigator(self.root)
-        self.derived = DerivedNavigator(self.root)
+        base = _resolve_root(root) if root is not None else None
+        self.wave2d = Wave2DNavigator(base / "wave2d" if base else None)
+        self.elmfire = ElmfireNavigator(base / "elmfire" if base else None)
+        self.derived = DerivedNavigator(base / "derived" if base else None)
 
 
 def default_navigator() -> DataNavigator:
-    """Фасад для корня по умолчанию (``WAVE2D_DATA_DIR`` или ``<repo>/data``)."""
+    """Фасад с папками по умолчанию (настройки или ``data_root()``)."""
     return DataNavigator()
 
 

@@ -6,7 +6,7 @@
 ``manifest``/``input``; кнопка (или двойной клик) открывает
 :class:`~src.wave2d.viewer.W2DViewer` в отдельном окне ``Toplevel``.
 
-Кнопка **«Открыть»** в шапке позволяет выбрать другой корень данных; выбранный
+Кнопка **«Открыть»** в шапке позволяет выбрать другую папку Wave2D; выбранный
 путь запоминается между запусками через :mod:`src.common.settings`.
 При наличии WSL рядом добавляются кнопки с именами дистрибутивов
 (:mod:`src.common.wsl`) — клик открывает диалог сразу в его файловой системе.
@@ -21,7 +21,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from src.common.h5reader import H5Reader
 from src.common.navigator import Wave2DNavigator
-from src.common.settings import get_last_data_root, set_last_data_root
+from src.common.settings import set_navigator_root
 from src.common.wsl import wsl_roots
 from src.wave2d.schema import UnsupportedFormatError, ensure_supported_path
 
@@ -33,12 +33,8 @@ class W2DNavigatorApp:
 
     def __init__(self, root: tk.Tk, root_dir: str | None = None):
         self.root = root
-        # Аргумент CLI главнее: он не переопределяется сохранённой настройкой.
-        # Сохранённый путь берём только если он ещё существует (конфиг может
-        # отсутствовать или указывать на удалённую папку).
-        if root_dir is None:
-            saved = get_last_data_root()
-            root_dir = str(saved) if saved is not None and saved.is_dir() else None
+        # root_dir с CLI главнее; иначе Wave2DNavigator сам возьмёт сохранённую
+        # папку Wave2D из настроек или дефолт (data_root()/wave2d).
         self.nav = Wave2DNavigator(root_dir)
 
         self._paths: dict[str, Path] = {}  # iid узла -> путь к results.h5
@@ -101,24 +97,24 @@ class W2DNavigatorApp:
         paned.add(right, weight=3)
 
     def _update_data_label(self) -> None:
-        self.data_label.configure(text=f"Данные: {self.nav.root}")
+        self.data_label.configure(text=f"Wave2D: {self.nav.root}")
 
     def choose_data_root(self, initialdir: str | Path | None = None) -> None:
-        """Выбор корня данных через диалог; выбор сохраняется между запусками.
+        """Выбор папки Wave2D через диалог; выбор сохраняется между запусками.
 
         ``initialdir`` позволяет открыть диалог сразу в заданной папке
         (напр. в корне WSL-дистрибутива по кнопке с его именем).
         """
         selected = filedialog.askdirectory(
             parent=self.root,
-            title="Выберите корень данных",
+            title="Выберите папку Wave2D",
             initialdir=str(initialdir or self.nav.root),
             mustexist=True,
         )
         if not selected:
             return
         self.nav = Wave2DNavigator(selected)
-        set_last_data_root(self.nav.root)
+        set_navigator_root(self.nav.NAME, self.nav.root)
         self._update_data_label()
         self.populate()
 
