@@ -33,7 +33,7 @@ Python-комплекс для конвертации, 2D-визуализаци
 | Параметр | тороидальное число `nphi` (`nphi+122`); бывает серия по `Nr` | — |
 
 **Единственное пересечение** — интеграл перекрытия
-`∫ f_ELMFIRE(t,ρ,θ)·Ea_Wave2D(ρ,θ)·ρ dρ dθ` в `integrator.py`. Его целевое место —
+`∫ f_ELMFIRE(t,ρ,θ)·Ea_Wave2D(ρ,θ)·ρ dρ dθ` в `tools/integrator.py`. Его целевое место —
 отдельный слой `src/coupling/`. См. `TODO_elmfire.md`.
 
 ## Окружение и команды
@@ -51,7 +51,7 @@ uv run w2d_render.py          # 2D-графики полей из results.h5
 uv run w2d_viewer.py          # GUI: дерево results.h5 + изображение поля
 uv run w2d_app.py             # GUI: выбор прогона Wave2D -> открыть w2d_viewer
 uv run elmfire_viewer.py      # GUI просмотра флуктуаций
-uv run integrator.py          # интеграл перекрытия
+uv run tools/integrator.py    # интеграл перекрытия
 uv run elmfire_video.py       # derived/frames/*.png -> fluctuations_evolution.mp4
 ```
 
@@ -77,11 +77,11 @@ elmfire_convert.py           # точка входа конвертации ELMF
 tools/elmfire_reader.py      # инспекция .dat + рендер кадров в derived/frames
 tools/count_points_per_index.py  # точек на временной индекс (derived)
 tools/integrator_test_pi.py  # проверка интеграла единичных полей (сходимость к π)
+tools/integrator.py          # пример интеграла перекрытия (отложено, см. TODO_elmfire.md)
 w2d_render.py                # 2D-визуализация полей Wave2D
 w2d_viewer.py                # точка входа GUI-просмотрщика (логика в src/wave2d/)
 w2d_app.py                   # точка входа GUI-навигатора (логика в src/wave2d/)
 elmfire_viewer.py            # точка входа GUI-просмотрщика флуктуаций (src/elmfire/)
-integrator.py                # пример интеграла перекрытия
 elmfire_video.py             # сборка видео
 ```
 
@@ -164,7 +164,7 @@ data/
 3. **Legacy 0.9: `coord/rho` длиннее `Nr`** (Globus 397 ≠ 361, FT2 56 ≠ 51).
    Первые `Nr` — физическая сетка, остальное — margin; в 0.94 (`Nrmargin` удалён)
    `grid/rho` уже длины `Nr`. Не используй `coord/rho` целиком.
-4. **`integrator.py` хардкодит кадр 42.** Постановка интеграла ещё не зафиксирована.
+4. **`tools/integrator.py` хардкодит кадр 42.** Постановка интеграла ещё не зафиксирована.
 5. **Данные вложены: `<case_id>/<stamp>/`.** Единого `<case_id>/results.h5` нет:
    прогон лежит в `<case_id>/<stamp>/` (`results.h5` — общий файл серии по `nphi`,
    `tasks/<задача>/results.h5` — по моде). Учитывается `Navigator`

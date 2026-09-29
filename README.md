@@ -63,12 +63,12 @@ wave2d-visualizer/
 ├── tools/
 │   ├── elmfire_reader.py        # инспекция .dat + рендер кадров в derived/frames
 │   ├── count_points_per_index.py  # число точек на каждый временной индекс
-│   └── integrator_test_pi.py    # проверка интеграла единичных полей (→ π)
+│   ├── integrator_test_pi.py    # проверка интеграла единичных полей (→ π)
+│   └── integrator.py            # пример интеграла перекрытия (отложено)
 ├── w2d_render.py                # 2D-визуализация полей из results.h5
 ├── w2d_app.py                   # точка входа: GUI-навигатор по прогонам
 ├── w2d_viewer.py                # точка входа: GUI-просмотрщик датасета
 ├── elmfire_viewer.py            # точка входа: GUI-просмотрщик флуктуаций (z1.h5)
-├── integrator.py                # пример интегрирования по кадру флуктуаций
 ├── elmfire_video.py             # сборка PNG -> fluctuations_evolution.mp4
 ├── run_w2d_app.bat              # Windows-лаунчер: w2d_app.py через uv
 ├── pyproject.toml
@@ -167,7 +167,7 @@ uv run elmfire_viewer.py
 Интеграл произведения флуктуаций и поля на новой регулярной полярной сетке:
 
 ```bash
-uv run integrator.py          # кадр z1.h5 (WagD) + поле Ea из results.h5 (FT-2_LH_smoke_nphi)
+uv run tools/integrator.py    # кадр z1.h5 (WagD) + поле Ea из results.h5 (FT-2_LH_smoke_nphi)
 uv run tools/integrator_test_pi.py  # проверка на единичных полях
 ```
 

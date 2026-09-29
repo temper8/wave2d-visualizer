@@ -31,8 +31,8 @@
       (endpoint=True) при данных на `[0, 2π)` (endpoint=False) → шаг `2π/(N−1)` вместо `2π/N`.
       Систематическая ошибка. Корректна только `get_periodic_interpolator`.
       Либо удалить непериодическую версию, либо исправить на `endpoint=False`.
-      Баг проявляется только в интеграле (`integrator.py`, coupling), поэтому лежит здесь.
-- [ ] **(P1) `integrator.py` читает `f_theta`, но не использует её** — мёртвый код.
+      Баг проявляется только в интеграле (`tools/integrator.py`, coupling), поэтому лежит здесь.
+- [ ] **(P1) `tools/integrator.py` читает `f_theta`, но не использует её** — мёртвый код.
 - [x] **(P1) `app_tk.py` и `app_vis_fluct_tk.py` — полные дубликаты.** Оставлен
       один файл, позже переименован в `elmfire_viewer.py` (логика — `src/elmfire/`).
 - [x] **(P2) Двойной вызов `root.mainloop()`** в GUI-файлах. Дубликат удалён,
@@ -46,7 +46,7 @@
 
 - [ ] **(P1) Шаг 3.** Обернуть `PlasmaFluctuations` → `ElmfireFluctuations`,
       возвращающий `Field2D` / `FieldTimeSeries` вместо сырых массивов.
-- [ ] **(P1) Шаг 4.** Переписать `integrator.py` на `common` + оба адаптера.
+- [ ] **(P1) Шаг 4.** Переписать `tools/integrator.py` на `common` + оба адаптера.
 - [ ] **(P1) Шаг 5.** Тесты: превратить `tools/integrator_test_pi.py` в pytest
       (`tests/test_integrate.py`). Пока файл — скретч-проверка в `tools/`;
       проверка `∫1·1·ρ dρ dθ = π(hi²−lo²)`.
@@ -55,7 +55,7 @@
 
 - [ ] **(P1) Перенести ELMFIRE и `derived` в `Navigator`** (сейчас — модульные функции).
 - [ ] **(P1) Убрать хардкод кейса `wave2d_latest("FT-2_LH_smoke_nphi")`** из
-      `integrator.py`/`tools/integrator_test_pi.py`.
+      `tools/integrator.py`/`tools/integrator_test_pi.py`.
 - [x] **(P2) Диагностические утилиты вынесены в `tools/`**
       (`elmfire_reader.py`, `count_points_per_index.py`). Заодно путь рендера
       исправлен на `derived/frames/<run>/` (было `plots_2d/` в CWD).
