@@ -46,7 +46,7 @@ Python-комплекс для конвертации, 2D-визуализаци
 Основные скрипты:
 
 ```bash
-uv run converter_to_hdf.py    # Elmfire_WagD/*.dat -> z1.h5
+uv run elmfire_convert.py     # ELMFIRE *.dat -> z1.h5
 uv run w2d_render.py          # 2D-графики полей из results.h5
 uv run w2d_viewer.py          # GUI: дерево results.h5 + изображение поля
 uv run w2d_app.py             # GUI: выбор прогона Wave2D -> открыть w2d_viewer
@@ -70,8 +70,9 @@ src/
 │   ├── viewer.py            # W2DViewer — окно просмотра results.h5
 │   └── app.py               # W2DNavigatorApp — GUI-навигатор по прогонам
 └── elmfire/
+    ├── convert.py           # convert_raw_to_h5 — ELMFIRE .dat -> z1.h5
     └── viewer.py            # ElmfireFluctuationsViewer — просмотр z1.h5
-converter_to_hdf.py          # ELMFIRE .dat -> HDF5
+elmfire_convert.py           # точка входа конвертации ELMFIRE .dat -> z1.h5
 tools/elmfire_reader.py      # инспекция .dat + рендер кадров в derived/frames
 tools/count_points_per_index.py  # точек на временной индекс (derived)
 w2d_render.py                # 2D-визуализация полей Wave2D
@@ -103,7 +104,7 @@ data/
 ├── elmfire/
 │   └── WagD/
 │       ├── raw/*.dat         # nep_z1.dat, polar/rho/time mesh, *.rar
-│       └── converted/z1.h5   # результат converter_to_hdf.py
+│       └── converted/z1.h5   # результат elmfire_convert.py
 └── derived/
     ├── plots/{FT-2_LH_smoke,FT-2_LH_smoke_nphi,FT2}/   # карты полей (w2d_render.py)
     ├── frames/WagD/          # 945 PNG кадров флуктуаций
@@ -116,7 +117,7 @@ data/
   Не хардкодить `results.h5` / `z1.h5` / `Elmfire_WagD`.
 - Скрипты принимают `run_id` первым аргументом
   (`uv run w2d_render.py FT-2_LH_smoke_nphi/2026-09-29_13-56-49`,
-  `uv run converter_to_hdf.py WagD`). `w2d_render.py` по умолчанию берёт свежий
+  `uv run elmfire_convert.py WagD`). `w2d_render.py` по умолчанию берёт свежий
   прогон `FT-2_LH_smoke_nphi` (`wave2d_latest("FT-2_LH_smoke_nphi")`); ELMFIRE — `WagD`.
 - Всё, что генерирует код (PNG, MP4, интегралы), писать **только** в `derived/`.
 - `catalog.json` и sidecar `run.json` пока **не реализованы** — см. `TODO.md`.

@@ -23,7 +23,7 @@
           |
    [ операции ]                 ← interpolate, integrate, visualize
           |
-      [ apps ]                  ← w2d_render.py, w2d_app.py, w2d_viewer.py, elmfire_viewer.py, integrator.py
+      [ apps ]                  ← w2d_render.py, w2d_app.py, w2d_viewer.py, elmfire_convert.py, elmfire_viewer.py, integrator.py
 ```
 
 ## 🚧 Блокеры физики (сделать до рефакторинга)
@@ -91,7 +91,7 @@
       ├── elmfire/     # адаптер ELMFIRE: raw_reader.py, convert.py, fluctuations.py
       ├── coupling/    # пересечение: overlap.py
       ├── viz/         # общая визуализация
-      └── apps/        # w2d_render.py, w2d_app.py, w2d_viewer.py, elmfire_viewer.py, integrator.py
+      └── apps/        # w2d_render.py, w2d_app.py, w2d_viewer.py, elmfire_convert.py, elmfire_viewer.py, integrator.py
       ```
 
 - [ ] **(P3) Шаг 7.** После стабилизации слоёв — оценить физическое разделение на репозитории

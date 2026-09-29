@@ -48,6 +48,7 @@ wave2d-visualizer/
 │   ├── common/h5reader.py       # H5Reader — чтение HDF5 (массивы/атрибуты)
 │   ├── wave2d/viewer.py         # W2DViewer — просмотр results.h5
 │   ├── wave2d/app.py            # W2DNavigatorApp — GUI-навигатор по прогонам
+│   ├── elmfire/convert.py       # convert_raw_to_h5 — .dat -> z1.h5
 │   ├── elmfire/viewer.py        # ElmfireFluctuationsViewer — просмотр z1.h5
 │   ├── utils.py                 # чтение HDF5, 2D-визуализация полей, вывод атрибутов
 │   ├── integrate.py             # интеграл произведения флуктуаций и поля
@@ -57,7 +58,7 @@ wave2d-visualizer/
 │   ├── wave2d/FT-2_LH_smoke{,_nphi}/  # результаты Wave2D (results.h5)
 │   ├── elmfire/WagD/            # ELMFIRE: raw/*.dat и converted/z1.h5
 │   └── derived/                 # plots/, frames/, video/, coupling/
-├── converter_to_hdf.py          # ELMFIRE .dat -> HDF5 (z1.h5)
+├── elmfire_convert.py           # точка входа: ELMFIRE .dat -> HDF5 (z1.h5)
 ├── tools/
 │   ├── elmfire_reader.py        # инспекция .dat + рендер кадров в derived/frames
 │   └── count_points_per_index.py  # число точек на каждый временной индекс
@@ -87,7 +88,7 @@ data/
 ├── elmfire/
 │   └── WagD/
 │       ├── raw/*.dat         # исходные файлы ELMFIRE
-│       └── converted/z1.h5   # результат converter_to_hdf.py
+│       └── converted/z1.h5   # результат elmfire_convert.py
 └── derived/
     ├── plots/{FT-2_LH_smoke,FT-2_LH_smoke_nphi,FT2}/  # карты полей (w2d_render.py)
     ├── frames/WagD/          # PNG-кадры флуктуаций
@@ -116,7 +117,7 @@ data/
 Читает `.dat`-файлы из `data/elmfire/<run>/raw/` и сохраняет сжатый `z1.h5`:
 
 ```bash
-uv run converter_to_hdf.py WagD
+uv run elmfire_convert.py WagD
 ```
 
 ### 2. Просмотр структуры .dat и подсчёт точек
