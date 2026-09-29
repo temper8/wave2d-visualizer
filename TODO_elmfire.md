@@ -47,14 +47,15 @@
 - [ ] **(P1) Шаг 3.** Обернуть `PlasmaFluctuations` → `ElmfireFluctuations`,
       возвращающий `Field2D` / `FieldTimeSeries` вместо сырых массивов.
 - [ ] **(P1) Шаг 4.** Переписать `integrator.py` на `common` + оба адаптера.
-- [ ] **(P1) Шаг 5.** Тесты: превратить `integrator_test_pi.py` в pytest
-      (проверка `∫1·1·ρ dρ dθ = π(hi²−lo²)`).
+- [ ] **(P1) Шаг 5.** Тесты: превратить `tools/integrator_test_pi.py` в pytest
+      (`tests/test_integrate.py`). Пока файл — скретч-проверка в `tools/`;
+      проверка `∫1·1·ρ dρ dθ = π(hi²−lo²)`.
 
 ## 🗄️ Организация исходных данных
 
 - [ ] **(P1) Перенести ELMFIRE и `derived` в `Navigator`** (сейчас — модульные функции).
 - [ ] **(P1) Убрать хардкод кейса `wave2d_latest("FT-2_LH_smoke_nphi")`** из
-      `integrator.py`/`integrator_test_pi.py`.
+      `integrator.py`/`tools/integrator_test_pi.py`.
 - [x] **(P2) Диагностические утилиты вынесены в `tools/`**
       (`elmfire_reader.py`, `count_points_per_index.py`). Заодно путь рендера
       исправлен на `derived/frames/<run>/` (было `plots_2d/` в CWD).

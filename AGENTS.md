@@ -76,12 +76,12 @@ src/
 elmfire_convert.py           # точка входа конвертации ELMFIRE .dat -> z1.h5
 tools/elmfire_reader.py      # инспекция .dat + рендер кадров в derived/frames
 tools/count_points_per_index.py  # точек на временной индекс (derived)
+tools/integrator_test_pi.py  # проверка интеграла единичных полей (сходимость к π)
 w2d_render.py                # 2D-визуализация полей Wave2D
 w2d_viewer.py                # точка входа GUI-просмотрщика (логика в src/wave2d/)
 w2d_app.py                   # точка входа GUI-навигатора (логика в src/wave2d/)
 elmfire_viewer.py            # точка входа GUI-просмотрщика флуктуаций (src/elmfire/)
 integrator.py                # пример интеграла перекрытия
-integrator_test_pi.py        # проверка на единичных полях
 elmfire_video.py             # сборка видео
 ```
 
