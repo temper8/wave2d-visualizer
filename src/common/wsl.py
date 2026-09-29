@@ -42,12 +42,12 @@ def wsl_distros() -> list[str]:
 
 
 def wsl_roots() -> list[tuple[str, str]]:
-    """Пары ``(подпись, UNC-путь)`` для меню; пусто, если WSL недоступен."""
+    """Пары ``(имя дистрибутива, UNC-путь)``; пусто, если WSL недоступен."""
     distros = wsl_distros()
     root = _unc_root()
     if not distros or root is None:
         return []
-    return [(f"WSL: {d}", f"{root}\\{d}") for d in distros]
+    return [(d, f"{root}\\{d}") for d in distros]
 
 
 def _unc_root() -> str | None:

@@ -8,8 +8,8 @@
 
 Кнопка **«Открыть»** в шапке позволяет выбрать другой корень данных; выбранный
 путь запоминается между запусками через :mod:`src.common.settings`.
-В меню кнопки добавляются быстрые переходы в дистрибутивы WSL
-(:mod:`src.common.wsl`), которые не видны в нативном диалоге Windows.
+При наличии WSL рядом добавляются кнопки с именами дистрибутивов
+(:mod:`src.common.wsl`) — клик открывает диалог сразу в его файловой системе.
 
 Точка входа — ``w2d_app.py`` в корне репозитория.
 """
@@ -58,9 +58,13 @@ class W2DNavigatorApp:
         self.data_label.pack(side=tk.LEFT)
         self._update_data_label()
         ttk.Button(header, text="Обновить", command=self.populate).pack(side=tk.RIGHT)
-        self.open_mb = ttk.Menubutton(header, text="Открыть")
-        self.open_mb["menu"] = self._build_open_menu()
-        self.open_mb.pack(side=tk.RIGHT, padx=(0, 4))
+        for name, path in wsl_roots():
+            ttk.Button(
+                header, text=name, command=lambda p=path: self.choose_data_root(p)
+            ).pack(side=tk.RIGHT, padx=(0, 4))
+        ttk.Button(header, text="Открыть", command=self.choose_data_root).pack(
+            side=tk.RIGHT, padx=(0, 4)
+        )
 
         paned = ttk.Panedwindow(self.root, orient=tk.HORIZONTAL)
         paned.pack(fill=tk.BOTH, expand=True, padx=6, pady=4)
@@ -96,20 +100,6 @@ class W2DNavigatorApp:
         paned.add(left, weight=2)
         paned.add(right, weight=3)
 
-    def _build_open_menu(self) -> tk.Menu:
-        """Меню «Открыть»: выбор папки + быстрые переходы в дистрибутивы WSL."""
-        menu = tk.Menu(self.open_mb, tearoff=False)
-        menu.add_command(label="Выбрать папку…", command=self.choose_data_root)
-        roots = wsl_roots()
-        if roots:
-            menu.add_separator()
-            for label, path in roots:
-                menu.add_command(
-                    label=label,
-                    command=lambda p=path: self.choose_data_root(p),
-                )
-        return menu
-
     def _update_data_label(self) -> None:
         self.data_label.configure(text=f"Данные: {self.nav.root}")
 
@@ -117,7 +107,7 @@ class W2DNavigatorApp:
         """Выбор корня данных через диалог; выбор сохраняется между запусками.
 
         ``initialdir`` позволяет открыть диалог сразу в заданной папке
-        (напр. в корне WSL-дистрибутива из меню «Открыть»).
+        (напр. в корне WSL-дистрибутива по кнопке с его именем).
         """
         selected = filedialog.askdirectory(
             parent=self.root,
