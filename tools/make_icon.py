@@ -6,6 +6,7 @@
 
     uv run tools/make_icon.py                        # все три варианта (превью)
     uv run tools/make_icon.py --variant b --out src/wave2d/assets
+    uv run tools/make_icon.py --variant a --out src/wave2d/assets --ico   # + .ico
 
 Используется ``Agg`` — окно не создаётся, иконка рисуется молча.
 """
@@ -28,10 +29,12 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Circle
+from PIL import Image
 
 from src.common.paths import derived
 
-SIZE = 256  # сторона PNG в пикселях
+SIZE = 256  # сторона мастер-PNG в пикселях
+ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)  # размеры кадров внутри .ico
 
 # Цвета вариантов
 _BG = "#0d1b2a"
@@ -119,6 +122,12 @@ def render(variant: str, path: Path) -> None:
     plt.close(fig)
 
 
+def _write_ico(master_png: Path, ico_path: Path) -> None:
+    """Собирает многоразмерный ICO из мастер-PNG (Windows выберет нужный кадр)."""
+    with Image.open(master_png) as image:
+        image.save(ico_path, format="ICO", sizes=[(s, s) for s in ICO_SIZES])
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Генератор иконки w2d_app")
     parser.add_argument(
@@ -133,6 +142,11 @@ def main(argv: list[str] | None = None) -> None:
         default=derived("icons"),
         help="каталог для PNG (по умолчанию data/derived/icons)",
     )
+    parser.add_argument(
+        "--ico",
+        action="store_true",
+        help="вдобавок собрать многоразмерный .ico рядом с каждым PNG",
+    )
     args = parser.parse_args(argv)
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -146,6 +160,10 @@ def main(argv: list[str] | None = None) -> None:
     for variant, path in targets:
         render(variant, path)
         print(f"{variant}: {path}")
+        if args.ico:
+            ico_path = path.with_suffix(".ico")
+            _write_ico(path, ico_path)
+            print(f"{variant}: {ico_path}")
 
 
 if __name__ == "__main__":

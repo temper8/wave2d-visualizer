@@ -70,7 +70,8 @@ src/
 │   ├── viewer.py            # W2DViewer — окно просмотра results.h5
 │   ├── app.py               # W2DNavigatorApp — GUI-навигатор по прогонам
 │   └── assets/
-│       └── w2d_app_icon.png # иконка окна (генератор — tools/make_icon.py)
+│       ├── w2d_app_icon.png # иконка окна (генератор — tools/make_icon.py)
+│       └── w2d_app_icon.ico # многоразмерный .ico для ярлыка (тот же генератор, --ico)
 └── elmfire/
     ├── convert.py           # convert_raw_to_h5 — ELMFIRE .dat -> z1.h5
     ├── video.py             # make_fluctuations_video — кадры -> MP4

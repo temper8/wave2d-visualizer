@@ -48,7 +48,7 @@ wave2d-visualizer/
 │   ├── common/h5reader.py       # H5Reader — чтение HDF5 (массивы/атрибуты)
 │   ├── wave2d/viewer.py         # W2DViewer — просмотр results.h5
 │   ├── wave2d/app.py            # W2DNavigatorApp — GUI-навигатор по прогонам
-│   ├── wave2d/assets/           # иконка окна (генератор — tools/make_icon.py)
+│   ├── wave2d/assets/           # иконка окна/ярлыка (генератор — tools/make_icon.py)
 │   ├── elmfire/convert.py       # convert_raw_to_h5 — .dat -> z1.h5
 │   ├── elmfire/video.py         # make_fluctuations_video — кадры -> MP4
 │   ├── elmfire/viewer.py        # ElmfireFluctuationsViewer — просмотр z1.h5
