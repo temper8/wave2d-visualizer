@@ -1,4 +1,9 @@
 import sys
+from pathlib import Path
+
+# tools/ запускается как скрипт (sys.path[0] = tools/): кладём корень
+# репозитория на sys.path, чтобы импортировался пакет ``src``.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from matplotlib import pyplot as plt
 import pandas as pd

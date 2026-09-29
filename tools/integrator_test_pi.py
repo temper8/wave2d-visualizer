@@ -1,3 +1,10 @@
+import sys
+from pathlib import Path
+
+# tools/ запускается как скрипт (sys.path[0] = tools/): кладём корень
+# репозитория на sys.path, чтобы импортировался пакет ``src``.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import h5py
 from scipy.interpolate import RegularGridInterpolator
 import numpy as np
