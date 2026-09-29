@@ -32,6 +32,9 @@ from src.wave2d.schema import UnsupportedFormatError, ensure_supported_path
 
 from src.wave2d.viewer import W2DViewer
 
+# Иконка окна — единый PNG рядом с модулем (генератор: tools/make_icon.py).
+_ICON_PATH = Path(__file__).resolve().parent / "assets" / "w2d_app_icon.png"
+
 
 class W2DNavigatorApp:
     """Окно выбора прогона Wave2D и запуска просмотрщика."""
@@ -47,10 +50,22 @@ class W2DNavigatorApp:
 
         self.root.title("W2D Navigator")
         self.root.geometry("980x640")
+        self._set_window_icon()
         self.setup_ui()
         self.populate()
 
     # --- интерфейс -------------------------------------------------------
+
+    def _set_window_icon(self) -> None:
+        """Ставит иконку окна; ``default=True`` — её получают и дочерние Toplevel.
+
+        Отсутствие ассета — не ошибка: окно откроется со стандартной иконкой.
+        """
+        try:
+            self._icon = tk.PhotoImage(file=str(_ICON_PATH))
+        except (OSError, tk.TclError):
+            return
+        self.root.iconphoto(True, self._icon)
 
     def setup_ui(self) -> None:
         header = ttk.Frame(self.root)

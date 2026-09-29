@@ -68,7 +68,9 @@ src/
 ├── plasma_fluctuations.py   # PlasmaFluctuations — ленивое чтение кадров z1.h5
 ├── wave2d/
 │   ├── viewer.py            # W2DViewer — окно просмотра results.h5
-│   └── app.py               # W2DNavigatorApp — GUI-навигатор по прогонам
+│   ├── app.py               # W2DNavigatorApp — GUI-навигатор по прогонам
+│   └── assets/
+│       └── w2d_app_icon.png # иконка окна (генератор — tools/make_icon.py)
 └── elmfire/
     ├── convert.py           # convert_raw_to_h5 — ELMFIRE .dat -> z1.h5
     ├── video.py             # make_fluctuations_video — кадры -> MP4
@@ -78,6 +80,7 @@ tools/elmfire_reader.py      # инспекция .dat + рендер кадро
 tools/count_points_per_index.py  # точек на временной индекс (derived)
 tools/integrator_test_pi.py  # проверка интеграла единичных полей (сходимость к π)
 tools/integrator.py          # пример интеграла перекрытия (отложено, см. TODO_elmfire.md)
+tools/make_icon.py           # генератор иконки w2d_app (варианты a/b/c)
 w2d_render.py                # 2D-визуализация полей Wave2D
 w2d_viewer.py                # точка входа GUI-просмотрщика (логика в src/wave2d/)
 w2d_app.py                   # точка входа GUI-навигатора (логика в src/wave2d/)
