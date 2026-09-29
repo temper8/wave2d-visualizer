@@ -52,7 +52,7 @@ uv run w2d_viewer.py          # GUI: дерево results.h5 + изображе�
 uv run w2d_app.py             # GUI: выбор прогона Wave2D -> открыть w2d_viewer
 uv run elmfire_viewer.py      # GUI просмотра флуктуаций
 uv run integrator.py          # интеграл перекрытия
-uv run make_video.py          # plots_2d/*.png -> fluctuations_evolution.mp4
+uv run make_video.py          # derived/frames/*.png -> fluctuations_evolution.mp4
 ```
 
 ## Карта репозитория
@@ -72,8 +72,8 @@ src/
 └── elmfire/
     └── viewer.py            # ElmfireFluctuationsViewer — просмотр z1.h5
 converter_to_hdf.py          # ELMFIRE .dat -> HDF5
-Elmfire_reader.py            # просмотр структуры .dat
-count_point_per_index.py     # точек на временной индекс
+tools/elmfire_reader.py      # инспекция .dat + рендер кадров в derived/frames
+tools/count_points_per_index.py  # точек на временной индекс (derived)
 w2d_render.py                # 2D-визуализация полей Wave2D
 w2d_viewer.py                # точка входа GUI-просмотрщика (логика в src/wave2d/)
 w2d_app.py                   # точка входа GUI-навигатора (логика в src/wave2d/)

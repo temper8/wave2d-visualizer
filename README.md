@@ -58,8 +58,9 @@ wave2d-visualizer/
 │   ├── elmfire/WagD/            # ELMFIRE: raw/*.dat и converted/z1.h5
 │   └── derived/                 # plots/, frames/, video/, coupling/
 ├── converter_to_hdf.py          # ELMFIRE .dat -> HDF5 (z1.h5)
-├── Elmfire_reader.py            # просмотр структуры .dat-файлов
-├── count_point_per_index.py     # число точек на каждый временной индекс
+├── tools/
+│   ├── elmfire_reader.py        # инспекция .dat + рендер кадров в derived/frames
+│   └── count_points_per_index.py  # число точек на каждый временной индекс
 ├── w2d_render.py                # 2D-визуализация полей из results.h5
 ├── w2d_app.py                   # точка входа: GUI-навигатор по прогонам
 ├── w2d_viewer.py                # точка входа: GUI-просмотрщик датасета
@@ -121,11 +122,11 @@ uv run converter_to_hdf.py WagD
 ### 2. Просмотр структуры .dat и подсчёт точек
 
 ```bash
-uv run Elmfire_reader.py WagD
-uv run count_point_per_index.py WagD
+uv run tools/elmfire_reader.py WagD
+uv run tools/count_points_per_index.py WagD
 ```
 
-`count_point_per_index.py` сохранит статистику в
+`count_points_per_index.py` сохранит статистику в
 `data/derived/WagD/points_per_time_index.txt`.
 
 ### 3. 2D-визуализация полей

@@ -160,6 +160,9 @@ data/                              # корень = WAVE2D_DATA_DIR (по умо
 ## 🧹 Инфраструктура и гигиена
 
 - [ ] **(P2) Добавить `pytest` в dev-зависимости** (`uv add --dev pytest`) и папку `tests/`.
+- [x] **(P2) Диагностические утилиты вынесены в `tools/`**
+      (`elmfire_reader.py`, `count_points_per_index.py`). Заодно путь рендера
+      исправлен на `derived/frames/<run>/` (было `plots_2d/` в CWD).
 - [x] **(P2) Не коммитить крупные бинарники.** В `.gitignore` уже есть `*.h5`, `*.dat`,
       `*.rar`, `*.mp4`, `*.png`, `*.txt`; добавлен `data/`.
 - [x] **(P3) `uv.lock` закоммичен** (убран из `.gitignore`) для воспроизводимости.
