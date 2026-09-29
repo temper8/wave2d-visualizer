@@ -10,6 +10,7 @@
 путь запоминается между запусками через :mod:`src.common.settings`.
 При наличии WSL рядом добавляются кнопки с именами дистрибутивов
 (:mod:`src.common.wsl`) — клик открывает диалог сразу в его файловой системе.
+Имя текущей папки — меню с историей открытых папок (:mod:`src.common.settings`).
 
 Точка входа — ``w2d_app.py`` в корне репозитория.
 """
@@ -21,7 +22,11 @@ from tkinter import filedialog, messagebox, ttk
 
 from src.common.h5reader import H5Reader
 from src.common.navigator import Wave2DNavigator
-from src.common.settings import set_navigator_root
+from src.common.settings import (
+    get_navigator_history,
+    push_navigator_history,
+    set_navigator_root,
+)
 from src.common.wsl import wsl_roots
 from src.wave2d.schema import UnsupportedFormatError, ensure_supported_path
 
@@ -50,9 +55,9 @@ class W2DNavigatorApp:
     def setup_ui(self) -> None:
         header = ttk.Frame(self.root)
         header.pack(fill=tk.X, padx=6, pady=4)
-        self.data_label = ttk.Label(header, anchor="w")
+        self.data_label = ttk.Menubutton(header, text="")
         self.data_label.pack(side=tk.LEFT)
-        self._update_data_label()
+        self._update_folder_menu()
         ttk.Button(header, text="Обновить", command=self.populate).pack(side=tk.RIGHT)
         for name, path in wsl_roots():
             ttk.Button(
@@ -96,8 +101,39 @@ class W2DNavigatorApp:
         paned.add(left, weight=2)
         paned.add(right, weight=3)
 
-    def _update_data_label(self) -> None:
+    def _update_folder_menu(self) -> None:
+        """Обновляет подпись текущей папки и меню истории открытых папок."""
         self.data_label.configure(text=f"Wave2D: {self.nav.root}")
+        menu = tk.Menu(self.data_label, tearoff=False)
+        history = get_navigator_history(self.nav.NAME)
+        if history:
+            for path in history:
+                menu.add_command(
+                    label=str(path),
+                    command=lambda p=path: self.open_from_history(p),
+                )
+        else:
+            menu.add_command(label="(история пуста)", state="disabled")
+        self.data_label["menu"] = menu
+
+    def open_from_history(self, path: Path) -> None:
+        """Переключается на папку из истории; если её нет — предупреждает."""
+        if not path.is_dir():
+            messagebox.showwarning(
+                "Папка недоступна",
+                f"Папка не найдена:\n{path}",
+                parent=self.root,
+            )
+            return
+        self._set_data_root(path)
+
+    def _set_data_root(self, path: str | Path) -> None:
+        """Переключает навигатор на папку, сохраняет её и историю."""
+        self.nav = Wave2DNavigator(path)
+        set_navigator_root(self.nav.NAME, self.nav.root)
+        push_navigator_history(self.nav.NAME, self.nav.root)
+        self._update_folder_menu()
+        self.populate()
 
     def choose_data_root(self, initialdir: str | Path | None = None) -> None:
         """Выбор папки Wave2D через диалог; выбор сохраняется между запусками.
@@ -113,10 +149,7 @@ class W2DNavigatorApp:
         )
         if not selected:
             return
-        self.nav = Wave2DNavigator(selected)
-        set_navigator_root(self.nav.NAME, self.nav.root)
-        self._update_data_label()
-        self.populate()
+        self._set_data_root(selected)
 
     # --- построение дерева ----------------------------------------------
 

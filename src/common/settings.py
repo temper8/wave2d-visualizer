@@ -7,9 +7,10 @@ Windows — ``%APPDATA%\\wave2d-visualizer\\settings.json``,
 ничего не пишется.
 
 Хранит последнюю открытую папку **каждого навигатора** (``wave2d``,
-``elmfire``, ``derived``) — у каждого слоя данных своя папка. Общий корень
-(``WAVE2D_DATA_DIR``) используется только как значение по умолчанию, пока
-настройка не задана (условный «первый запуск»).
+``elmfire``, ``derived``) — у каждого слоя данных своя папка — и историю
+открытых папок (``navigator_history``; сейчас пишется только для ``wave2d``).
+Общий корень (``WAVE2D_DATA_DIR``) используется только как значение по
+умолчанию, пока настройка не задана (условный «первый запуск»).
 """
 
 from __future__ import annotations
@@ -22,6 +23,9 @@ _APP_NAME = "wave2d-visualizer"
 _SETTINGS_NAME = "settings.json"
 
 _NAVIGATOR_ROOTS = "navigator_roots"
+_NAVIGATOR_HISTORY = "navigator_history"
+
+HISTORY_LIMIT = 10
 
 
 def config_dir() -> Path:
@@ -81,3 +85,32 @@ def set_navigator_root(name: str, path: str | Path) -> None:
     roots[name] = str(Path(path).expanduser().resolve())
     data[_NAVIGATOR_ROOTS] = roots
     save_settings(data)
+
+
+def get_navigator_history(name: str) -> list[Path]:
+    """История папок навигатора ``name`` (от новых к старым)."""
+    history = load_settings().get(_NAVIGATOR_HISTORY)
+    if not isinstance(history, dict):
+        return []
+    values = history.get(name)
+    if not isinstance(values, list):
+        return []
+    return [Path(v).expanduser() for v in values if isinstance(v, str) and v]
+
+
+def push_navigator_history(
+    name: str, path: str | Path, limit: int = HISTORY_LIMIT
+) -> list[Path]:
+    """Добавляет папку в историю навигатора (свежие сверху, без дублей)."""
+    new = Path(path).expanduser().resolve()
+    history = [p for p in get_navigator_history(name) if p != new]
+    history.insert(0, new)
+    del history[limit:]
+    data = load_settings()
+    store = data.get(_NAVIGATOR_HISTORY)
+    if not isinstance(store, dict):
+        store = {}
+    store[name] = [str(p) for p in history]
+    data[_NAVIGATOR_HISTORY] = store
+    save_settings(data)
+    return history
