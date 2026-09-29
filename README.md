@@ -53,7 +53,7 @@ wave2d-visualizer/
 │   ├── interpolator.py          # построение интерполяторов (с замыканием theta и без)
 │   └── plasma_fluctuations.py   # класс PlasmaFluctuations: ленивое чтение кадров
 ├── data/                        # данные вне git, см. AGENTS.md
-│   ├── wave2d/{Globus,FT2}/     # результаты Wave2D (results.h5)
+│   ├── wave2d/FT-2_LH_smoke{,_nphi}/  # результаты Wave2D (results.h5)
 │   ├── elmfire/WagD/            # ELMFIRE: raw/*.dat и converted/z1.h5
 │   └── derived/                 # plots/, frames/, video/, coupling/
 ├── converter_to_hdf.py          # ELMFIRE .dat -> HDF5 (z1.h5)
@@ -79,14 +79,15 @@ wave2d-visualizer/
 ```
 data/
 ├── wave2d/
-│   ├── Globus/results.h5     # nphi-014
-│   └── FT2/results.h5        # nphi-122
+│   ├── FT-2_LH_smoke_nphi/<stamp>/results.h5          # серия по nphi (5 мод)
+│   ├── FT-2_LH_smoke/<stamp>/tasks/Nr+051/results.h5  # одиночный прогон
+│   └── FT2/<stamp>/results.h5                         # legacy 0.9 (не читается)
 ├── elmfire/
 │   └── WagD/
 │       ├── raw/*.dat         # исходные файлы ELMFIRE
 │       └── converted/z1.h5   # результат converter_to_hdf.py
 └── derived/
-    ├── plots/{Globus,FT2}/   # карты полей (w2d_render.py)
+    ├── plots/{FT-2_LH_smoke,FT-2_LH_smoke_nphi,FT2}/  # карты полей (w2d_render.py)
     ├── frames/WagD/          # PNG-кадры флуктуаций
     ├── video/                # fluctuations_evolution.mp4
     └── coupling/             # результаты интеграла перекрытия
@@ -99,8 +100,9 @@ data/
 | `data/elmfire/WagD/raw/time_z1.dat` | временные индексы и физическое время |
 | `data/elmfire/WagD/raw/nep_z1.dat` | значения флуктуаций плотности (`time_index, rho, theta, d_dens`) |
 | `data/elmfire/WagD/converted/z1.h5` | сконвертированные флуктуации |
-| `data/wave2d/Globus/results.h5` | поля Wave2D, ран Globus (nphi-014) |
-| `data/wave2d/FT2/results.h5` | поля Wave2D, ран FT2 (nphi-122) |
+| `data/wave2d/FT-2_LH_smoke_nphi/<stamp>/results.h5` | поля Wave2D, серия по `nphi` (5 мод) |
+| `data/wave2d/FT-2_LH_smoke/<stamp>/tasks/Nr+051/results.h5` | поля Wave2D, одиночный прогон |
+| `data/wave2d/FT2/<stamp>/results.h5` | поля Wave2D, legacy 0.9 (ридер не поддерживает) |
 
 > ⚠️ Большие бинарные файлы (`*.h5`, `*.dat`, `*.rar`) не хранятся в git.
 > Пути в коде берутся через `src/common/paths.py`, а не задаются вручную.
@@ -131,15 +133,15 @@ uv run count_point_per_index.py WagD
 из `results.h5` и сохраняет их в `data/derived/plots/<run>/`:
 
 ```bash
-uv run w2d_render.py                          # свежий прогон FT2
-uv run w2d_render.py FT2/2026-09-23_21-58-05  # конкретный прогон
+uv run w2d_render.py                                 # свежий FT-2_LH_smoke_nphi
+uv run w2d_render.py FT-2_LH_smoke_nphi/2026-09-29_13-56-49  # конкретный прогон
 ```
 
 Интерактивный просмотр полей (дерево файла, выбор прогона):
 
 ```bash
 uv run w2d_app.py        # навигатор по прогонам -> открыть viewer
-uv run w2d_viewer.py     # viewer для свежего прогона FT2
+uv run w2d_viewer.py     # viewer для свежего FT-2_LH_smoke_nphi
 ```
 
 На Windows навигатор можно запустить без терминала — двойным кликом по
@@ -161,7 +163,7 @@ uv run app_tk.py
 Интеграл произведения флуктуаций и поля на новой регулярной полярной сетке:
 
 ```bash
-uv run integrator.py          # кадр z1.h5 (WagD) + поле Ea из results.h5 (Globus)
+uv run integrator.py          # кадр z1.h5 (WagD) + поле Ea из results.h5 (FT-2_LH_smoke_nphi)
 uv run integrator_test_pi.py  # проверка на единичных полях
 ```
 

@@ -104,10 +104,10 @@
 ```
 data/                              # корень = WAVE2D_DATA_DIR (по умолчанию <repo>/data)
 ├── wave2d/<case_id>/<stamp>/results.h5          # + tasks/<task>/results.h5
-├── wave2d/<case_id>/results.h5                  # legacy-плоско (Globus)
+├── wave2d/<case_id>/results.h5                  # legacy-плоско (напр. Globus)
 ├── elmfire/WagD/{raw/*.dat, converted/z1.h5}
 ├── derived/
-│   ├── plots/{Globus,FT2}/
+│   ├── plots/{FT-2_LH_smoke,FT-2_LH_smoke_nphi,FT2}/
 │   ├── frames/WagD/
 │   ├── video/
 │   └── coupling/
@@ -130,7 +130,8 @@ data/                              # корень = WAVE2D_DATA_DIR (по умо
       сохранены, `paths.py` реэкспортирует навигаторы.
 - [ ] **(P1) Перенести ELMFIRE и `derived` в `Navigator`** (сейчас — модульные функции).
 - [x] **(P1) `w2d_render.py` открывает `run_id = <case_id>/<stamp>`**; по умолчанию —
-      свежий прогон FT2 (`wave2d_latest("FT2")`). Заодно исправлено: формат
+      свежий прогон `FT-2_LH_smoke_nphi` (`wave2d_latest("FT-2_LH_smoke_nphi")`).
+      Заодно исправлено: формат
       группы `nphi+122` и путь `field_2D` (было `field_2d`), `print_dict` без
       cp1251-непечатаемых символов.
 - [x] **(P1) Поддержать схему `results.h5` >= 0.94.** Введён
@@ -141,8 +142,8 @@ data/                              # корень = WAVE2D_DATA_DIR (по умо
       переведены на новые пути (`/grid`, `/input`, `/plasma/*`, `/fields/nphi*`,
       `/manifest`), спекa обновлена (`docs/results_h5.md`).
 - [ ] **(P1) Флаг `--latest`** в `w2d_render.py` (явный выбор свежего прогона кейса).
-- [ ] **(P1) Убрать хардкод `wave2d_results("Globus")`** из
-      `integrator.py`/`integrator_test_pi.py`.
+- [ ] **(P1) Убрать хардкод кейса `wave2d_latest("FT-2_LH_smoke_nphi")`** из
+      `integrator.py`/`integrator_test_pi.py`/`src/utils.py`.
 - [ ] **(P2) `tests/test_paths.py`** — разбор `run_id`, legacy, дискавери, `latest`
       (нужен `pytest`).
 - [ ] **(P1) `run_id` + `run.json`** (sidecar): выжимка из h5-атрибутов без чтения массивов

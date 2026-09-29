@@ -27,7 +27,7 @@ Python-комплекс для конвертации, 2D-визуализаци
 |---|---|---|
 | Файлы | `results.h5` (+ `tasks/<задача>/results.h5`) | `Elmfire_WagD/*.dat` → `z1.h5` |
 | Что это | стационарные 2D-поля (решение волнового уравнения) | временной ряд турбулентных флуктуаций |
-| Сетка | `(rho, theta)`: Globus `(361, 1024)`, FT2 `(51, 128)` | `(121, 600)` |
+| Сетка | `(rho, theta)`: FT-2_LH_smoke(-nphi) `(51, 128)`; legacy 0.9: Globus `(361, 1024)`, FT2 `(51, 128)` | `(121, 600)` |
 | Время | нет | 945 кадров |
 | Тип данных | `complex128` (Ex/Ey/Ez, eps, eta, gee) | `float32`, вещественное |
 | Параметр | тороидальное число `nphi` (`nphi+122`); бывает серия по `Nr` | — |
@@ -91,19 +91,19 @@ make_video.py                # сборка видео
 ```
 data/
 ├── wave2d/
-│   ├── Globus/
-│   │   └── results.h5               # один прогон, nphi-014, (361, 1024)
-│   └── FT2/                         # кейс (`case_id`); внутри — прогоны `<stamp>`
-│       └── <timestamp>/             # напр. 2026-09-23_21-58-05
-│           ├── results.h5           # общий файл серии по nphi (5 мод)
-│           ├── input.toml, done_tasks.txt, system_info.ini, ...
-│           └── tasks/<задача>/results.h5   # по файлу на моду: nphi+000 … nphi-122
+│   ├── FT-2_LH_smoke_nphi/          # кейс (`case_id`): серия по nphi
+│   │   └── <stamp>/                 # напр. 2026-09-29_13-56-49
+│   │       ├── results.h5           # общий файл серии по nphi (5 мод)
+│   │       ├── input.toml, done_tasks.txt, system_info.ini, ...
+│   │       └── tasks/<задача>/results.h5   # по файлу на моду: nphi+000 … nphi-122
+│   ├── FT-2_LH_smoke/               # кейс: одиночный прогон, только tasks/Nr+051/
+│   └── FT2/                         # legacy 0.9 — не читается (нужен >= 0.94)
 ├── elmfire/
 │   └── WagD/
 │       ├── raw/*.dat         # nep_z1.dat, polar/rho/time mesh, *.rar
 │       └── converted/z1.h5   # результат converter_to_hdf.py
 └── derived/
-    ├── plots/{Globus,FT2}/   # карты полей (w2d_render.py)
+    ├── plots/{FT-2_LH_smoke,FT-2_LH_smoke_nphi,FT2}/   # карты полей (w2d_render.py)
     ├── frames/WagD/          # 945 PNG кадров флуктуаций
     ├── video/                # fluctuations_evolution.mp4
     └── coupling/             # результаты интеграла перекрытия
@@ -112,14 +112,16 @@ data/
 - Все пути — только через `src/common/paths.py` (`wave2d_results`, `elmfire_raw`,
   `elmfire_converted`, `frames_dir`, `video_dir`, `plots_dir`, `derived`, ...).
   Не хардкодить `results.h5` / `z1.h5` / `Elmfire_WagD`.
-- Скрипты принимают `run_id` первым аргументом (`uv run w2d_render.py FT2/2026-09-23_21-58-05`,
-  `uv run converter_to_hdf.py WagD`). `w2d_render.py` по умолчанию берёт свежий прогон FT2
-  (`wave2d_latest("FT2")`); ELMFIRE — `WagD`.
+- Скрипты принимают `run_id` первым аргументом
+  (`uv run w2d_render.py FT-2_LH_smoke_nphi/2026-09-29_13-56-49`,
+  `uv run converter_to_hdf.py WagD`). `w2d_render.py` по умолчанию берёт свежий
+  прогон `FT-2_LH_smoke_nphi` (`wave2d_latest("FT-2_LH_smoke_nphi")`); ELMFIRE — `WagD`.
 - Всё, что генерирует код (PNG, MP4, интегралы), писать **только** в `derived/`.
 - `catalog.json` и sidecar `run.json` пока **не реализованы** — см. `TODO.md`.
-- Wave2D: кейсы (`case_id`: `Globus`, `FT2`, ...) — подкаталоги `data/wave2d/`;
-  внутри кейса — прогоны `<stamp>` (`FT2/<stamp>/`). Legacy-плоско
-  (`Globus/results.h5`) поддержано. Список кейсов не хардкодится — дискавери и
+- Wave2D: кейсы (`case_id`: `FT-2_LH_smoke`, `FT-2_LH_smoke_nphi`, `FT2`, ...) —
+  подкаталоги `data/wave2d/`; внутри кейса — прогоны `<stamp>`
+  (`FT-2_LH_smoke_nphi/<stamp>/`). Legacy-плоско (`Globus/results.h5`) поддержано.
+  Список кейсов не хардкодится — дискавери и
   пути даёт `navigator.DataNavigator` (фасад): `nav.wave2d.cases()/runs()/
   latest()/results()/task_results()`. База — `Navigator` (корень + `path()`),
   `Wave2DNavigator` — реализован, `ElmfireNavigator`/`DerivedNavigator` — заглушки
@@ -155,13 +157,14 @@ data/
    Не строишь интеграл, пока не убедился в согласованности единиц (множитель 100).
 2. **`get_interpolator` (непериодический) содержит баг** с `endpoint=True`.
    Использовать `get_periodic_interpolator`. Подробности — в `TODO.md`.
-3. **`coord/rho` = 397 ≠ Nr = 361 (Globus).** Первые `Nr` — физическая сетка,
-   остальное — margin. Не используй `coord/rho` целиком.
+3. **Legacy 0.9: `coord/rho` длиннее `Nr`** (Globus 397 ≠ 361, FT2 56 ≠ 51).
+   Первые `Nr` — физическая сетка, остальное — margin; в 0.94 (`Nrmargin` удалён)
+   `grid/rho` уже длины `Nr`. Не используй `coord/rho` целиком.
 4. **`integrator.py` хардкодит кадр 42.** Постановка интеграла ещё не зафиксирована.
-5. **FT2 — вложенный каталог прогонов.** Единого `FT2/results.h5` нет: данные
-   в `FT2/<stamp>/` (`results.h5` — общий файл серии по `nphi`,
+5. **Данные вложены: `<case_id>/<stamp>/`.** Единого `<case_id>/results.h5` нет:
+   прогон лежит в `<case_id>/<stamp>/` (`results.h5` — общий файл серии по `nphi`,
    `tasks/<задача>/results.h5` — по моде). Учитывается `Navigator`
-   (`run_id = "FT2/<stamp>"`); переход CLI — в `TODO.md`.
+   (`run_id = "<case_id>/<stamp>"`).
 6. **Сентинелы на оси `ir = 0` — `0.0`, а не `NaN`.** Незаполненные точки равны
    нулю; в `plasma/params` вне первой точки — мусор. Подробности —
    [`docs/results_h5.md`](docs/results_h5.md).
