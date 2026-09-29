@@ -48,6 +48,7 @@ wave2d-visualizer/
 │   ├── common/h5reader.py       # H5Reader — чтение HDF5 (массивы/атрибуты)
 │   ├── wave2d/viewer.py         # W2DViewer — просмотр results.h5
 │   ├── wave2d/app.py            # W2DNavigatorApp — GUI-навигатор по прогонам
+│   ├── elmfire/viewer.py        # ElmfireFluctuationsViewer — просмотр z1.h5
 │   ├── utils.py                 # чтение HDF5, 2D-визуализация полей, вывод атрибутов
 │   ├── integrate.py             # интеграл произведения флуктуаций и поля
 │   ├── interpolator.py          # построение интерполяторов (с замыканием theta и без)
@@ -62,7 +63,7 @@ wave2d-visualizer/
 ├── w2d_render.py                # 2D-визуализация полей из results.h5
 ├── w2d_app.py                   # точка входа: GUI-навигатор по прогонам
 ├── w2d_viewer.py                # точка входа: GUI-просмотрщик датасета
-├── app_tk.py                    # GUI: просмотр флуктуаций (Tkinter + Matplotlib)
+├── elmfire_viewer.py            # точка входа: GUI-просмотрщик флуктуаций (z1.h5)
 ├── integrator.py                # пример интегрирования по кадру флуктуаций
 ├── integrator_test_pi.py        # тест интегрирования на единичных полях
 ├── make_video.py                # сборка PNG -> fluctuations_evolution.mp4
@@ -155,7 +156,7 @@ uv run w2d_viewer.py     # viewer для свежего FT-2_LH_smoke_nphi
 GUI с ползунком по времени на базе Tkinter + Matplotlib:
 
 ```bash
-uv run app_tk.py
+uv run elmfire_viewer.py
 ```
 
 ### 5. Численное интегрирование

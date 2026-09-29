@@ -50,7 +50,7 @@ uv run converter_to_hdf.py    # Elmfire_WagD/*.dat -> z1.h5
 uv run w2d_render.py          # 2D-графики полей из results.h5
 uv run w2d_viewer.py          # GUI: дерево results.h5 + изображение поля
 uv run w2d_app.py             # GUI: выбор прогона Wave2D -> открыть w2d_viewer
-uv run app_tk.py              # GUI просмотра флуктуаций
+uv run elmfire_viewer.py      # GUI просмотра флуктуаций
 uv run integrator.py          # интеграл перекрытия
 uv run make_video.py          # plots_2d/*.png -> fluctuations_evolution.mp4
 ```
@@ -66,16 +66,18 @@ src/
 ├── integrate.py             # integrate_on_custom_grid() — интеграл перекрытия
 ├── interpolator.py          # get_periodic_interpolator / get_interpolator
 ├── plasma_fluctuations.py   # PlasmaFluctuations — ленивое чтение кадров z1.h5
-└── wave2d/
-    ├── viewer.py            # W2DViewer — окно просмотра results.h5
-    └── app.py               # W2DNavigatorApp — GUI-навигатор по прогонам
+├── wave2d/
+│   ├── viewer.py            # W2DViewer — окно просмотра results.h5
+│   └── app.py               # W2DNavigatorApp — GUI-навигатор по прогонам
+└── elmfire/
+    └── viewer.py            # ElmfireFluctuationsViewer — просмотр z1.h5
 converter_to_hdf.py          # ELMFIRE .dat -> HDF5
 Elmfire_reader.py            # просмотр структуры .dat
 count_point_per_index.py     # точек на временной индекс
 w2d_render.py                # 2D-визуализация полей Wave2D
 w2d_viewer.py                # точка входа GUI-просмотрщика (логика в src/wave2d/)
 w2d_app.py                   # точка входа GUI-навигатора (логика в src/wave2d/)
-app_tk.py                    # GUI: просмотр флуктуаций (Tkinter + Matplotlib)
+elmfire_viewer.py            # точка входа GUI-просмотрщика флуктуаций (src/elmfire/)
 integrator.py                # пример интеграла перекрытия
 integrator_test_pi.py        # проверка на единичных полях
 make_video.py                # сборка видео
@@ -149,7 +151,7 @@ data/
   не грузить `results.h5`/`z1.h5` целиком.
 - Для GUI использовать `matplotlib.use('TkAgg')` **до** импорта `pyplot`.
 - Новые модули класть в `src/`, скрипты-точки входа — в корне.
-- Не плодить дубликаты (`app_vis_fluct_tk.py` был копией `app_tk.py` — удалён).
+- Не плодить дубликаты (файл-копия `app_vis_fluct_tk.py` удалён).
 
 ## Известные подводные камни
 

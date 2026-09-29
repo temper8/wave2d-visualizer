@@ -23,7 +23,7 @@
           |
    [ операции ]                 ← interpolate, integrate, visualize
           |
-      [ apps ]                  ← w2d_render.py, w2d_app.py, w2d_viewer.py, app_tk.py, integrator.py
+      [ apps ]                  ← w2d_render.py, w2d_app.py, w2d_viewer.py, elmfire_viewer.py, integrator.py
 ```
 
 ## 🚧 Блокеры физики (сделать до рефакторинга)
@@ -50,8 +50,10 @@
       Либо удалить непериодическую версию, либо исправить на `endpoint=False`.
 - [ ] **(P1) `integrator.py` читает `f_theta`, но не использует её** — мёртвый код.
 - [x] **(P1) `app_tk.py` и `app_vis_fluct_tk.py` — полные дубликаты.** Оставлен
-      `app_tk.py`, файл-копия `app_vis_fluct_tk.py` удалён.
-- [ ] **(P2) Двойной вызов `root.mainloop()`** в конце обоих GUI-файлов.
+      один файл, позже переименован в `elmfire_viewer.py` (логика — `src/elmfire/`).
+- [x] **(P2) Двойной вызов `root.mainloop()`** в GUI-файлах. Дубликат удалён,
+      логика вынесена в `src/elmfire/viewer.py` (`ElmfireFluctuationsViewer`),
+      `mainloop()` остался только в точке входа `elmfire_viewer.py`.
 
 ## 🏗️ Рефакторинг (инкрементально, без «большого взрыва»)
 
@@ -89,7 +91,7 @@
       ├── elmfire/     # адаптер ELMFIRE: raw_reader.py, convert.py, fluctuations.py
       ├── coupling/    # пересечение: overlap.py
       ├── viz/         # общая визуализация
-      └── apps/        # w2d_render.py, w2d_app.py, w2d_viewer.py, app_tk.py, integrator.py
+      └── apps/        # w2d_render.py, w2d_app.py, w2d_viewer.py, elmfire_viewer.py, integrator.py
       ```
 
 - [ ] **(P3) Шаг 7.** После стабилизации слоёв — оценить физическое разделение на репозитории
