@@ -12,8 +12,13 @@ import os
 import shutil
 import subprocess
 
+from src.common import fsprobe
+
 # Корни UNC для доступа к WSL; берём первый существующий.
 _UNC_ROOTS = (r"\\wsl.localhost", r"\\wsl$")
+
+# Таймаут проверки UNC-корня: WSL отвечает быстро, а выключенный — не виснет.
+_UNC_TIMEOUT = 2.0
 
 
 def wsl_distros() -> list[str]:
@@ -51,9 +56,12 @@ def wsl_roots() -> list[tuple[str, str]]:
 
 
 def _unc_root() -> str | None:
-    """Первый доступный UNC-корень WSL."""
-    for root in _UNC_ROOTS:
-        if os.path.isdir(root):
-            return root
+    """Первый доступный UNC-корень WSL.
+
+    Проверка идёт через :mod:`src.common.fsprobe` с таймаутом: если WSL
+    остановлен, ``\\wsl$`` иначе подвис бы на SMB-таймаут в GUI-потоке.
+    """
+    for root in fsprobe.available_dirs(_UNC_ROOTS, timeout=_UNC_TIMEOUT):
+        return str(root)
     # Ни один не отвечает (WSL остановлен) — берём вариант по умолчанию.
     return _UNC_ROOTS[0]

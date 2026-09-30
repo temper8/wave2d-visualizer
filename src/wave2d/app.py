@@ -20,10 +20,12 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+from src.common import fsprobe
 from src.common.h5reader import H5Reader
-from src.common.navigator import Wave2DNavigator
+from src.common.navigator import Wave2DNavigator, data_root
 from src.common.settings import (
     get_navigator_history,
+    get_navigator_root,
     push_navigator_history,
     set_navigator_root,
 )
@@ -41,18 +43,133 @@ class W2DNavigatorApp:
 
     def __init__(self, root: tk.Tk, root_dir: str | None = None):
         self.root = root
-        # root_dir с CLI главнее; иначе Wave2DNavigator сам возьмёт сохранённую
-        # папку Wave2D из настроек или дефолт (data_root()/wave2d).
-        self.nav = Wave2DNavigator(root_dir)
+        self.root.title("W2D Navigator")
+        self.root.geometry("980x640")
+        self._set_window_icon()
 
         self._paths: dict[str, Path] = {}  # iid узла -> путь к results.h5
         self.selected: Path | None = None
 
-        self.root.title("W2D Navigator")
-        self.root.geometry("980x640")
-        self._set_window_icon()
+        # Проверяем доступность папки до построения навигатора: обращение
+        # к мёртвой сетевой шаре иначе виснет на SMB-таймаут ещё до отрисовки.
+        nav_root = self._resolve_data_root(root_dir)
+        if nav_root is None:
+            root.destroy()
+            return
+        self.nav = Wave2DNavigator(nav_root)
+
         self.setup_ui()
         self.populate()
+
+    # --- выбор корня данных ---------------------------------------------
+
+    @staticmethod
+    def _candidate_root(root_dir: str | None) -> Path:
+        """Корень Wave2D до обращения к ФС: CLI -> настройки -> ``data_root()``."""
+        if root_dir:
+            return Path(root_dir).expanduser()
+        saved = get_navigator_root(Wave2DNavigator.NAME)
+        if saved is not None:
+            return saved
+        return data_root() / Wave2DNavigator.SUBDIR
+
+    def _resolve_data_root(self, root_dir: str | None) -> Path | None:
+        """Возвращает доступный корень; при недоступности — выбор из истории.
+
+        ``None`` — пользователь отказался выбирать: приложение не открывается.
+        """
+        candidate = self._candidate_root(root_dir)
+        if fsprobe.is_dir(candidate):
+            return candidate
+        return self._prompt_data_root(candidate)
+
+    def _prompt_data_root(self, unavailable: Path) -> Path | None:
+        """Модальный диалог выбора папки, когда текущая недоступна.
+
+        Показывает доступные папки из истории (проверяются через
+        :mod:`src.common.fsprobe`), кнопки «Обзор…» и «Выход». Возвращает
+        выбранный путь или ``None``.
+        """
+        history = get_navigator_history(Wave2DNavigator.NAME)
+        # Недоступную папку повторно не проверяем (иначе лишний таймаут).
+        available = fsprobe.available_dirs(p for p in history if p != unavailable)
+        chosen: dict[str, Path | None] = {"path": None}
+
+        dlg = tk.Toplevel(self.root)
+        dlg.title("Папка данных недоступна")
+        dlg.transient(self.root)
+        dlg.resizable(False, False)
+
+        ttk.Label(
+            dlg,
+            justify="left",
+            text=(
+                "Папка недоступна:\n"
+                f"{unavailable}\n\n"
+                "Выберите другую папку из истории или укажите вручную:"
+            ),
+        ).pack(fill=tk.X, padx=10, pady=(10, 6))
+
+        listbox = tk.Listbox(
+            dlg, height=min(8, max(1, len(available))), width=70, selectmode="browse"
+        )
+        for path in available:
+            listbox.insert(tk.END, str(path))
+        if available:
+            listbox.selection_set(0)
+            listbox.activate(0)
+        listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 6))
+
+        def accept() -> None:
+            sel = listbox.curselection()
+            if not sel:
+                return
+            chosen["path"] = available[sel[0]]
+            dlg.destroy()
+
+        def browse() -> None:
+            selected = filedialog.askdirectory(
+                parent=dlg,
+                title="Выберите папку Wave2D",
+                mustexist=True,
+            )
+            if not selected:
+                return
+            path = Path(selected)
+            if not fsprobe.is_dir(path):
+                messagebox.showwarning(
+                    "Папка недоступна", f"Папка не найдена:\n{path}", parent=dlg
+                )
+                return
+            chosen["path"] = path
+            dlg.destroy()
+
+        buttons = ttk.Frame(dlg)
+        buttons.pack(fill=tk.X, padx=10, pady=(0, 10))
+        open_btn = ttk.Button(buttons, text="Открыть", command=accept)
+        open_btn.pack(side=tk.LEFT)
+        if not available:
+            open_btn.state(["disabled"])
+        ttk.Button(buttons, text="Обзор…", command=browse).pack(
+            side=tk.LEFT, padx=(6, 0)
+        )
+        ttk.Button(buttons, text="Выход", command=dlg.destroy).pack(side=tk.RIGHT)
+
+        listbox.bind("<Double-1>", lambda _e: accept())
+        dlg.bind("<Return>", lambda _e: accept())
+        dlg.bind("<Escape>", lambda _e: dlg.destroy())
+        dlg.protocol("WM_DELETE_WINDOW", dlg.destroy)
+        dlg.grab_set()
+        dlg.update_idletasks()
+        x = self.root.winfo_rootx() + (
+            self.root.winfo_width() - dlg.winfo_width()
+        ) // 2
+        y = self.root.winfo_rooty() + (
+            self.root.winfo_height() - dlg.winfo_height()
+        ) // 2
+        dlg.geometry(f"+{max(x, 0)}+{max(y, 0)}")
+        self.root.wait_window(dlg)
+        return chosen["path"]
 
     # --- интерфейс -------------------------------------------------------
 
@@ -133,7 +250,7 @@ class W2DNavigatorApp:
 
     def open_from_history(self, path: Path) -> None:
         """Переключается на папку из истории; если её нет — предупреждает."""
-        if not path.is_dir():
+        if not fsprobe.is_dir(path):
             messagebox.showwarning(
                 "Папка недоступна",
                 f"Папка не найдена:\n{path}",
@@ -144,6 +261,11 @@ class W2DNavigatorApp:
 
     def _set_data_root(self, path: str | Path) -> None:
         """Переключает навигатор на папку, сохраняет её и историю."""
+        if not fsprobe.is_dir(path):
+            messagebox.showwarning(
+                "Папка недоступна", f"Папка не найдена:\n{path}", parent=self.root
+            )
+            return
         self.nav = Wave2DNavigator(path)
         set_navigator_root(self.nav.NAME, self.nav.root)
         push_navigator_history(self.nav.NAME, self.nav.root)
@@ -170,12 +292,15 @@ class W2DNavigatorApp:
 
     def populate(self) -> None:
         """Перестраивает дерево по текущему состоянию файловой системы."""
-        self.tree.delete(*self.tree.get_children())
-        self._paths.clear()
-        self.selected = None
-        self.open_btn.configure(state="disabled")
-        self._set_info("Выберите results.h5 в дереве")
+        if not fsprobe.is_dir(self.nav.root):
+            new_root = self._prompt_data_root(self.nav.root)
+            if new_root is None:
+                self._clear_tree(f"Папка недоступна:\n{self.nav.root}")
+                return
+            self._set_data_root(new_root)
+            return
 
+        self._clear_tree("Выберите results.h5 в дереве")
         cases = self.nav.cases()
         if not cases:
             self.tree.insert("", "end", text="(нет кейсов в каталоге данных)", open=True)
@@ -209,6 +334,14 @@ class W2DNavigatorApp:
             self.tree.insert(parent, "end", iid=iid, text="results.h5")
             self._paths[iid] = path
 
+    def _clear_tree(self, info: str) -> None:
+        """Очищает дерево и инфо-панель, сбрасывая выбор."""
+        self.tree.delete(*self.tree.get_children())
+        self._paths.clear()
+        self.selected = None
+        self.open_btn.configure(state="disabled")
+        self._set_info(info)
+
     # --- обработчики -----------------------------------------------------
 
     def on_select(self, event=None) -> None:
@@ -228,8 +361,13 @@ class W2DNavigatorApp:
             self._open_viewer(self.selected)
 
     def _open_viewer(self, path: Path) -> None:
-        # Проверяем версию до создания окна: иначе при несовместимом
-        # формате останется пустой Toplevel.
+        # Проверяем доступность файла и версию до создания окна: иначе при
+        # недоступной шаре/несовместимом формате останется пустой Toplevel.
+        if not fsprobe.is_file(path):
+            messagebox.showerror(
+                "Файл недоступен", f"Файл не найден:\n{path}", parent=self.root
+            )
+            return
         try:
             ensure_supported_path(path)
         except UnsupportedFormatError as e:
@@ -240,6 +378,9 @@ class W2DNavigatorApp:
     # --- инфо-панель -----------------------------------------------------
 
     def _show_file_info(self, path: Path) -> None:
+        if not fsprobe.is_file(path):
+            self._set_info(f"Файл недоступен:\n{path}")
+            return
         size_mb = path.stat().st_size / 1e6
         lines = [f"Файл  : {path}", f"Размер: {size_mb:.2f} MB", ""]
         try:
