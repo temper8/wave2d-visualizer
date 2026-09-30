@@ -57,6 +57,10 @@ class W2DNavigatorApp:
             root.destroy()
             return
         self.nav = Wave2DNavigator(nav_root)
+        # Запоминаем фактически открытую папку (в т.ч. выбранную в диалоге
+        # недоступности) как последнюю — иначе следующий запуск снова попытается
+        # открыть старую (мёртвую) папку и снова покажет диалог.
+        self._remember_root()
 
         self.setup_ui()
         self.populate()
@@ -259,6 +263,11 @@ class W2DNavigatorApp:
             return
         self._set_data_root(path)
 
+    def _remember_root(self) -> None:
+        """Сохраняет текущую папку навигатора как последнюю открытую."""
+        set_navigator_root(self.nav.NAME, self.nav.root)
+        push_navigator_history(self.nav.NAME, self.nav.root)
+
     def _set_data_root(self, path: str | Path) -> None:
         """Переключает навигатор на папку, сохраняет её и историю."""
         if not fsprobe.is_dir(path):
@@ -267,8 +276,7 @@ class W2DNavigatorApp:
             )
             return
         self.nav = Wave2DNavigator(path)
-        set_navigator_root(self.nav.NAME, self.nav.root)
-        push_navigator_history(self.nav.NAME, self.nav.root)
+        self._remember_root()
         self._update_folder_menu()
         self.populate()
 
