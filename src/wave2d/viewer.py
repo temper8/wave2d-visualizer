@@ -118,7 +118,7 @@ class W2DViewer:
         # а toolbar ложится между холстом и атрибутами.
         attr_frame = self.attr_frame = ttk.Frame(right)
         attr_frame.pack(side=tk.BOTTOM, fill=tk.X)
-        self.attr_text = tk.Text(attr_frame, height=2, state="disabled", wrap="none")
+        self.attr_text = tk.Text(attr_frame, height=1, state="disabled", wrap="word")
         attr_sb = ttk.Scrollbar(
             attr_frame, orient="vertical", command=self.attr_text.yview
         )
@@ -148,7 +148,7 @@ class W2DViewer:
 
         ``expanded=True`` — нет датасета для визуализации: панель атрибутов
         занимает всю основную область. ``False`` — есть изображение: атрибуты
-        сжаты до двух строк внизу, а холст и toolbar занимают остальное.
+        сжаты до одной строки внизу, а холст и toolbar занимают остальное.
         """
         if getattr(self, "_attr_expanded", None) == expanded:
             return
