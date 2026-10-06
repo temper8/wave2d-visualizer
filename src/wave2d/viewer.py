@@ -18,7 +18,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 import tkinter as tk
 from tkinter import ttk
 
-from src.wave2d.schema import GRID_X, GRID_Y, open_results
+from src.wave2d.schema import GRID_X, GRID_Y, format_version_of, open_results
 
 
 class W2DViewer:
@@ -40,7 +40,11 @@ class W2DViewer:
         self.current_data: np.ndarray | None = None
         self._colorbar = None
 
-        self.root.title(f"W2D Viewer — {file_path}")
+        # Версия схемы — единственный атрибут корня; выносим её в заголовок,
+        # чтобы корневой узел в дереве был не нужен.
+        version = format_version_of(self.reader)
+        version_text = f"{version[0]}.{version[1]:02d}" if version else "?"
+        self.root.title(f"W2D Viewer — {file_path} (формат {version_text})")
         self.root.geometry("1150x780")
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
@@ -64,10 +68,6 @@ class W2DViewer:
     # --- интерфейс -------------------------------------------------------
 
     def setup_ui(self) -> None:
-        tk.Label(
-            self.root, text=f"Файл: {self.file_path}", anchor="w"
-        ).pack(fill=tk.X, padx=6, pady=3)
-
         paned = self.paned = ttk.Panedwindow(self.root, orient=tk.HORIZONTAL)
         paned.pack(fill=tk.BOTH, expand=True)
 
@@ -132,10 +132,15 @@ class W2DViewer:
         self._sash_done = True
 
     def populate_tree(self) -> None:
-        """Строит дерево содержимого файла через :meth:`H5Reader.walk`."""
-        self.tree.insert("", "end", iid="/", text="/", open=True)
+        """Строит дерево содержимого файла через :meth:`H5Reader.walk`.
+
+        Корень файла не показывается: его единственный атрибут —
+        ``format_version`` (вынесен в заголовок окна), а группы верхнего
+        уровня (``/manifest``, ``/input``, …) становятся корневыми узлами
+        дерева.
+        """
         for full, kind, obj in self.reader.walk("/"):
-            parent = full.rsplit("/", 1)[0] or "/"
+            parent = full.rsplit("/", 1)[0]
             name = full.rsplit("/", 1)[1]
             if kind == "group":
                 self.tree.insert(parent, "end", iid=full, text=name, open=False)
