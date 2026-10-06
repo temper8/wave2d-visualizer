@@ -113,9 +113,8 @@ class W2DViewer:
         self.canvas_widget = self.canvas.get_tk_widget()
         self.canvas_widget.pack(fill=tk.BOTH, expand=True)
 
-        # Панель атрибутов — внизу основной области, во всю ширину.
-        # Упаковывается до toolbar, поэтому остаётся самым нижним элементом,
-        # а toolbar ложится между холстом и атрибутами.
+        # Панель атрибутов показывается только когда нет датасета для
+        # визуализации и занимает всю основную область (см. _layout_right).
         attr_frame = self.attr_frame = ttk.Frame(right)
         attr_frame.pack(side=tk.BOTTOM, fill=tk.X)
         self.attr_text = tk.Text(attr_frame, height=1, state="disabled", wrap="word")
@@ -148,7 +147,7 @@ class W2DViewer:
 
         ``expanded=True`` — нет датасета для визуализации: панель атрибутов
         занимает всю основную область. ``False`` — есть изображение: атрибуты
-        сжаты до одной строки внизу, а холст и toolbar занимают остальное.
+        скрыты, а холст и toolbar занимают всю область.
         """
         if getattr(self, "_attr_expanded", None) == expanded:
             return
@@ -163,7 +162,6 @@ class W2DViewer:
             self.controls.pack(side=tk.TOP, fill=tk.X, padx=4, pady=4)
             self.canvas_widget.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
             self.toolbar.pack(side=tk.BOTTOM)
-            self.attr_frame.pack(side=tk.BOTTOM, fill=tk.X)
 
     def populate_tree(self) -> None:
         """Строит дерево содержимого файла через :meth:`H5Reader.walk`.
