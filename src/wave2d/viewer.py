@@ -50,6 +50,8 @@ class W2DViewer:
 
         self.setup_ui()
         self.populate_tree()
+        # Нет выбранного датасета: атрибуты сразу занимают основную область.
+        self.redraw()
         # Начальная ширина левой панели ~300 px (после первой раскладки окна).
         self._sash_done = False
         self.paned.bind("<Configure>", self._set_initial_sash, add="+")
@@ -71,7 +73,7 @@ class W2DViewer:
         paned = self.paned = ttk.Panedwindow(self.root, orient=tk.HORIZONTAL)
         paned.pack(fill=tk.BOTH, expand=True)
 
-        # --- левая часть: дерево + атрибуты ---
+        # --- левая часть: дерево ---
         left = ttk.Frame(paned)
         self.tree = ttk.Treeview(left, show="tree", selectmode="browse")
         tree_sb = ttk.Scrollbar(left, orient="vertical", command=self.tree.yview)
@@ -79,19 +81,13 @@ class W2DViewer:
         self.tree.grid(row=0, column=0, sticky="nsew")
         tree_sb.grid(row=0, column=1, sticky="ns")
 
-        self.attr_text = tk.Text(left, height=7, state="disabled", wrap="none")
-        attr_sb = ttk.Scrollbar(left, orient="vertical", command=self.attr_text.yview)
-        self.attr_text.configure(yscrollcommand=attr_sb.set)
-        self.attr_text.grid(row=1, column=0, sticky="ew")
-        attr_sb.grid(row=1, column=1, sticky="ns")
-
         left.rowconfigure(0, weight=1)
         left.columnconfigure(0, weight=1)
         self.tree.bind("<<TreeviewSelect>>", self.on_select)
 
-        # --- центр: переключатели + холст ---
+        # --- центр: переключатели + холст + атрибуты ---
         right = ttk.Frame(paned)
-        controls = ttk.Frame(right)
+        controls = self.controls = ttk.Frame(right)
         controls.pack(fill=tk.X, padx=4, pady=4)
 
         default_view = "rz" if self.R is not None else "rho"
@@ -114,7 +110,23 @@ class W2DViewer:
 
         self.fig, self.ax = plt.subplots(figsize=(6.5, 5.5))
         self.canvas = FigureCanvasTkAgg(self.fig, master=right)
-        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        self.canvas_widget = self.canvas.get_tk_widget()
+        self.canvas_widget.pack(fill=tk.BOTH, expand=True)
+
+        # Панель атрибутов — внизу основной области, во всю ширину.
+        # Упаковывается до toolbar, поэтому остаётся самым нижним элементом,
+        # а toolbar ложится между холстом и атрибутами.
+        attr_frame = self.attr_frame = ttk.Frame(right)
+        attr_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        self.attr_text = tk.Text(attr_frame, height=2, state="disabled", wrap="none")
+        attr_sb = ttk.Scrollbar(
+            attr_frame, orient="vertical", command=self.attr_text.yview
+        )
+        self.attr_text.configure(yscrollcommand=attr_sb.set)
+        self.attr_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        attr_sb.pack(side=tk.RIGHT, fill=tk.Y)
+        self._set_attr_text("(выберите узел в дереве)")
+
         self.toolbar = NavigationToolbar2Tk(self.canvas, right)
         self.toolbar.update()
 
@@ -130,6 +142,28 @@ class W2DViewer:
         except tk.TclError:
             return  # окно ещё не готово — попробуем на следующем <Configure>
         self._sash_done = True
+
+    def _layout_right(self, expanded: bool) -> None:
+        """Перекладывает правую панель.
+
+        ``expanded=True`` — нет датасета для визуализации: панель атрибутов
+        занимает всю основную область. ``False`` — есть изображение: атрибуты
+        сжаты до двух строк внизу, а холст и toolbar занимают остальное.
+        """
+        if getattr(self, "_attr_expanded", None) == expanded:
+            return
+        self._attr_expanded = expanded
+        for widget in (
+            self.controls, self.canvas_widget, self.toolbar, self.attr_frame
+        ):
+            widget.pack_forget()
+        if expanded:
+            self.attr_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        else:
+            self.controls.pack(side=tk.TOP, fill=tk.X, padx=4, pady=4)
+            self.canvas_widget.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+            self.toolbar.pack(side=tk.BOTTOM)
+            self.attr_frame.pack(side=tk.BOTTOM, fill=tk.X)
 
     def populate_tree(self) -> None:
         """Строит дерево содержимого файла через :meth:`H5Reader.walk`.
@@ -166,16 +200,20 @@ class W2DViewer:
             self.current_data = self.reader.array(path)
         self.redraw()
 
+    def _set_attr_text(self, text: str) -> None:
+        """Заменяет содержимое панели атрибутов (панель только для чтения)."""
+        self.attr_text.configure(state="normal")
+        self.attr_text.delete("1.0", tk.END)
+        self.attr_text.insert("1.0", text)
+        self.attr_text.configure(state="disabled")
+
     def _show_attributes(self, path: str) -> None:
         try:
             attrs = self.reader.attrs(path) if self.reader.contains(path) else {}
         except Exception:
             attrs = {}
         lines = [f"{k} = {v}" for k, v in attrs.items()] or ["(атрибутов нет)"]
-        self.attr_text.configure(state="normal")
-        self.attr_text.delete("1.0", tk.END)
-        self.attr_text.insert("1.0", "\n".join(lines))
-        self.attr_text.configure(state="disabled")
+        self._set_attr_text("\n".join(lines))
 
     def _component(self, data: np.ndarray) -> np.ndarray:
         """Для комплексных данных — выбранная составляющая."""
@@ -198,6 +236,7 @@ class W2DViewer:
         self.ax.clear()
 
         data = self.current_data
+        self._layout_right(data is None)
         title = self.current_path or ""
 
         if data is None:
