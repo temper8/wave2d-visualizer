@@ -1,13 +1,16 @@
-"""Реестр сравнения графиков (MultiView) — данные без GUI.
+"""Сравнение графиков (MultiView): реестр и окно.
 
 Окно просмотра показывает один датасет за раз; чтобы сравнить одноимённые
 датасеты из **разных** расчётов, их складывают в общий набор
 :class:`ComparisonSet`. Элементы группируются по **имени** датасета (лист
-пути): одна группа — одна будущая вкладка MultiView. Реальная отрисовка —
-отдельный этап, здесь только модель данных и группировка.
+пути): одна группа — одна вкладка MultiView.
 
-Модуль не импортирует Tk и matplotlib: его можно проверять без графического
-интерфейса. GUI-окно живёт в этом же модуле ниже (добавляется отдельным шагом).
+Вкладки рисуются по размерности группы: 1D — наложение рядов с легендой
+(:func:`~src.wave2d.renderers.draw_curves`), 2D и прочее — текстовый список
+(сетка 2D — отдельная задача ``p2-multiview-2d-grid-rendering``).
+
+Модель данных (:class:`PlotItem`, :class:`ComparisonSet`) не зависит от Tk;
+GUI-окно — ниже в этом же модуле.
 
 См. ``TODO/p2-multiview-compare-runs.md``.
 """
@@ -22,6 +25,16 @@ from tkinter import ttk
 from typing import Any
 
 import numpy as np
+
+import matplotlib
+matplotlib.use("TkAgg")  # до импорта pyplot
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import (
+    FigureCanvasTkAgg,
+    NavigationToolbar2Tk,
+)
+
+from src.wave2d.renderers import component, draw_curves
 
 
 @dataclass
@@ -202,22 +215,23 @@ def default_comparison() -> ComparisonSet:
 
 
 class MultiViewWindow(tk.Toplevel):
-    """Окно сравнения: вкладка на группу, внутри — список графиков.
+    """Окно сравнения: вкладка на группу.
 
-    Реального рендера пока нет: вкладка показывает текстовый список
-    добавленных элементов (метка источника + путь узла + форма). Окно
-    подписывается на :class:`ComparisonSet` и перестраивается при изменениях.
+    1D-группа рисуется наложением рядов с легендой, 2D/прочее — текстовым
+    списком (реальный рендер 2D — отдельная задача). Окно подписывается на
+    :class:`ComparisonSet` и перестраивается при изменениях.
     """
 
     def __init__(self, comparison: ComparisonSet) -> None:
         super().__init__()
         self.comparison = comparison
         self.title("MultiView — сравнение графиков")
-        self.geometry("560x420")
-        self.minsize(360, 240)
+        self.geometry("720x520")
+        self.minsize(420, 300)
         # Закрытие прячет окно (набор сохраняется), а не уничтожает его.
         self.protocol("WM_DELETE_WINDOW", self.hide)
 
+        self._figures: list = []
         self._notebook = ttk.Notebook(self)
         self._notebook.pack(fill=tk.BOTH, expand=True, padx=4, pady=(4, 0))
         bottom = ttk.Frame(self)
@@ -246,6 +260,9 @@ class MultiViewWindow(tk.Toplevel):
 
     def refresh(self) -> None:
         """Перестраивает вкладки под текущее состояние набора."""
+        for fig in self._figures:
+            plt.close(fig)
+        self._figures.clear()
         for tab_id in self._notebook.tabs():
             self._notebook.forget(tab_id)
         for child in list(self._notebook.winfo_children()):
@@ -284,9 +301,51 @@ class MultiViewWindow(tk.Toplevel):
             self._selected_name = name
 
     def _build_tab(self, name: str) -> ttk.Frame:
-        """Вкладка группы: заголовок, список элементов и кнопка удаления."""
-        frame = ttk.Frame(self._notebook)
+        """Вкладка группы: 1D — график-наложение, иначе — текстовый список."""
         items = self.comparison.items(name)
+        if items and all(item.ndim == 1 for item in items):
+            return self._build_plot_tab(name, items)
+        return self._build_list_tab(name, items)
+
+    def _build_plot_tab(
+        self, name: str, items: list[PlotItem]
+    ) -> ttk.Frame:
+        """Вкладка 1D-группы: наложение рядов с легендой + удаление."""
+        frame = ttk.Frame(self._notebook)
+        fig, ax = plt.subplots(figsize=(6.4, 4.2), layout="constrained")
+        fig.get_layout_engine().set(w_pad=0.12, h_pad=0.12)
+        self._figures.append(fig)
+        canvas = FigureCanvasTkAgg(fig, master=frame)
+        canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        bottom = ttk.Frame(frame)
+        bottom.pack(side=tk.BOTTOM, fill=tk.X)
+        toolbar = NavigationToolbar2Tk(canvas, bottom)
+        toolbar.update()
+        toolbar.pack(side=tk.TOP, fill=tk.X)
+
+        series = [
+            (
+                None,
+                component(item.data, item.comp),
+                self._item_label(item),
+                item.color,
+            )
+            for item in items
+        ]
+        draw_curves(
+            ax, series, title=f"{name} — сравнение", xlabel="index", ylabel=name
+        )
+        canvas.draw()
+
+        self._add_remove_row(bottom, items)
+        return frame
+
+    def _build_list_tab(
+        self, name: str, items: list[PlotItem]
+    ) -> ttk.Frame:
+        """Вкладка прочих групп: заголовок, список элементов, удаление."""
+        frame = ttk.Frame(self._notebook)
         ttk.Label(
             frame, text=f"Датасет: {name}   (элементов: {len(items)})"
         ).pack(anchor="w", padx=6, pady=(6, 2))
@@ -302,12 +361,33 @@ class MultiViewWindow(tk.Toplevel):
             shape = tuple(item.data.shape) if item.data is not None else ()
             listbox.insert(tk.END, f"{item.source}   {item.node_path}   {shape}")
 
+        self._add_remove_row(frame, items, listbox)
+        return frame
+
+    def _add_remove_row(
+        self,
+        parent,
+        items: list[PlotItem],
+        listbox: tk.Listbox | None = None,
+    ) -> None:
+        """Строка удаления: список элементов (если не задан) и кнопка."""
+        row = ttk.Frame(parent)
+        row.pack(side=tk.TOP, fill=tk.X, padx=6, pady=6)
+        if listbox is None:
+            listbox = tk.Listbox(row, height=4, activestyle="none")
+            listbox.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            for item in items:
+                listbox.insert(tk.END, self._item_label(item))
         ttk.Button(
-            frame,
+            row,
             text="Удалить выбранное",
             command=lambda: self._remove_selected(listbox, items),
-        ).pack(anchor="e", padx=6, pady=6)
-        return frame
+        ).pack(side=tk.RIGHT, padx=(6, 0))
+
+    @staticmethod
+    def _item_label(item: PlotItem) -> str:
+        """Подпись элемента для легенды/списка: источник и путь узла."""
+        return f"{item.source} · {item.node_path}"
 
     def _remove_selected(
         self, listbox: tk.Listbox, items: list[PlotItem]
