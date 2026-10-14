@@ -47,7 +47,7 @@
       `Panedwindow`, связка `H5TreeView` + `DatasetView`, `on_closing`. Убрать из
       файла `import h5py` и `pyplot`. Поведение: есть 2D/1D → атрибуты скрыты;
       нет данных (группа/ошибка) → режим attrs.
-- [ ] **E.** Smoke вручную: `uv run w2d_viewer.py`, `uv run w2d_app.py`. После
+- [x] **E.** Smoke вручную: `uv run w2d_viewer.py`, `uv run w2d_app.py`. После
       появления `pytest` — тесты на `Selection` и диспетчер режимов (без Tk).
 - [ ] **F.** (позже) Расширить 1D (несколько кривых, подписи осей); вынести
       рендереры в отдельный модуль, если `datasetview.py` разрастётся.
