@@ -1,6 +1,6 @@
 # Несколько кривых в 1D-режиме `DatasetView` (multi-select)
 
-- **Приоритет:** P3
+- **Приоритет:** P0
 - **Статус:** todo
 - **Зависит от:** [done/2026-10-14-extend-1d-dataset-view-with-axes-and-multiple-curves.md](done/2026-10-14-extend-1d-dataset-view-with-axes-and-multiple-curves.md)
   (F1: оси `index/rho/psi`, подписи из `units`, комплексный рендер-заглушка)
