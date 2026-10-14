@@ -11,10 +11,11 @@
 - **message** — сообщение, если ничего не выбрано или размерность не
   поддерживается.
 
-Виджет владеет переключателями ``(R,Z)/(rho,theta)``, ``real/imag/abs``,
-холстом matplotlib и ``NavigationToolbar``. Окно-оркестратор лишь передаёт
-готовый :class:`Selection`. Сама отрисовка датасетов — в
-:mod:`src.wave2d.renderers` (без Tk).
+Виджет владеет холстом matplotlib и ``NavigationToolbar``; набор
+переключателей собирается под выбранный датасет: 2D — ``(R,Z)/(rho,theta)``
+и ``real/imag/abs``, 1D — ``index/rho/psi`` (и ``real/imag/abs`` для
+комплексных данных). Окно-оркестратор лишь передаёт готовый :class:`Selection`.
+Сама отрисовка датасетов — в :mod:`src.wave2d.renderers` (без Tk).
 """
 
 from __future__ import annotations
@@ -111,44 +112,22 @@ class DatasetView(ttk.Frame):
             self._axes["rho"] = rho
         if psi is not None:
             self._axes["psi"] = psi
-        if hasattr(self, "_axis_buttons"):
-            self._sync_axis_buttons()
+        if hasattr(self, "controls"):
+            # Вызвано после сборки — пересобираем переключатели под выбор.
+            self.show(self._selection)
 
     def _build(self) -> None:
-        """Создаёт переключатели, холст, атрибуты и toolbar."""
-        controls = self.controls = ttk.Frame(self)
+        """Создаёт панель управления, холст, атрибуты и toolbar.
 
-        default_view = "rz" if self.R is not None else "rho"
-        self.view_var = tk.StringVar(value=default_view)
-        ttk.Radiobutton(
-            controls, text="(R,Z)", variable=self.view_var, value="rz",
-            command=self.redraw,
-        ).pack(side=tk.LEFT)
-        ttk.Radiobutton(
-            controls, text="(rho,theta)", variable=self.view_var, value="rho",
-            command=self.redraw,
-        ).pack(side=tk.LEFT, padx=(0, 20))
-
+        Радиокнопки заранее не создаются: их набор зависит от выбранного
+        датасета и собирается в :meth:`_rebuild_controls`.
+        """
+        self.controls = ttk.Frame(self)
+        # Выборы переживают смену датасета: переключатели пересобираются, а
+        # значения (2D-вид, составляющая, ось) сохраняются.
+        self.view_var = tk.StringVar(value="rz" if self.R is not None else "rho")
         self.comp_var = tk.StringVar(value="abs")
-        for comp in ("real", "imag", "abs"):
-            ttk.Radiobutton(
-                controls, text=comp, variable=self.comp_var, value=comp,
-                command=self.redraw,
-            ).pack(side=tk.LEFT)
-
-        # Переключатель оси 1D: показывается только в 1D-режиме (см. _sync_axis_visibility).
         self.axis_var = tk.StringVar(value="index")
-        self.axis_frame = ttk.Frame(controls)
-        self._axis_buttons: dict[str, ttk.Radiobutton] = {}
-        ttk.Label(self.axis_frame, text="ось:").pack(side=tk.LEFT)
-        for name in ("index", "rho", "psi"):
-            button = ttk.Radiobutton(
-                self.axis_frame, text=name, variable=self.axis_var,
-                value=name, command=self.redraw,
-            )
-            button.pack(side=tk.LEFT)
-            self._axis_buttons[name] = button
-        self._sync_axis_buttons()
 
         self.fig, self.ax = plt.subplots(figsize=(6.5, 5.5))
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
@@ -193,8 +172,16 @@ class DatasetView(ttk.Frame):
     # --- показ -----------------------------------------------------------
 
     def show(self, selection: Selection | None) -> None:
-        """Показывает выбор (``None`` — узел не выбран)."""
+        """Показывает выбор (``None`` — узел не выбран).
+
+        Сначала пересобирает переключатели под режим выбранного датасета,
+        затем перерисовывает область.
+        """
         self._selection = selection
+        data = selection.data if selection is not None else None
+        path = selection.path if selection is not None else ""
+        mode, _ = self._mode(selection, data, path)
+        self._rebuild_controls(mode, data)
         self.redraw()
 
     def redraw(self) -> None:
@@ -214,7 +201,6 @@ class DatasetView(ttk.Frame):
 
         mode, message = self._mode(selection, data, path)
         self._layout(expanded=(mode == "attrs"))
-        self._sync_axis_visibility(mode)
 
         if mode == "attrs":
             self._set_attr_text(self._attrs_text(attrs))
@@ -256,25 +242,71 @@ class DatasetView(ttk.Frame):
             return "2d", ""
         return "message", f"{path}\nshape={data.shape}"
 
-    # --- 1D ---------------------------------------------------------------
+    # --- переключатели ----------------------------------------------------
 
-    def _sync_axis_visibility(self, mode: str) -> None:
-        """Показывает переключатель оси только в 1D-режиме."""
-        managed = self.axis_frame.winfo_manager()
-        if mode == "1d" and not managed:
-            self.axis_frame.pack(side=tk.LEFT, padx=(12, 0))
-        elif mode != "1d" and managed:
-            self.axis_frame.pack_forget()
+    def _rebuild_controls(self, mode: str, data: np.ndarray | None) -> None:
+        """Собирает панель переключателей под текущий режим.
 
-    def _sync_axis_buttons(self) -> None:
-        """Доступные оси — активны (``index`` всегда), недоступные — disabled."""
-        for name, button in self._axis_buttons.items():
-            if name == "index" or name in self._axes:
-                button.state(["!disabled"])
-            else:
-                button.state(["disabled"])
-        if self.axis_var.get() != "index" and self.axis_var.get() not in self._axes:
+        Создаются только применимые к датасету кнопки: 2D — вид и
+        составляющая, 1D — ось (и составляющая для комплексных данных),
+        ``attrs``/``message`` — панель пуста.
+        """
+        for child in self.controls.winfo_children():
+            child.destroy()
+
+        if mode == "2d":
+            self._add_view_buttons()
+            self._add_comp_buttons()
+        elif mode == "1d":
+            self._add_axis_buttons(data)
+            if np.iscomplexobj(data):
+                self._add_comp_buttons()
+
+    def _add_view_buttons(self) -> None:
+        """2D-вид ``(R,Z)/(rho,theta)``; ``(R,Z)`` — только если есть координаты."""
+        options = [("rho", "(rho,theta)")]
+        if self.R is not None:
+            options.insert(0, ("rz", "(R,Z)"))
+        if self.view_var.get() not in [value for value, _ in options]:
+            self.view_var.set("rho")
+        frame = ttk.Frame(self.controls)
+        frame.pack(side=tk.LEFT, padx=(0, 20))
+        for value, text in options:
+            ttk.Radiobutton(
+                frame, text=text, variable=self.view_var, value=value,
+                command=self.redraw,
+            ).pack(side=tk.LEFT)
+
+    def _add_comp_buttons(self) -> None:
+        """Составляющая ``real/imag/abs`` (2D и комплексный 1D)."""
+        if self.comp_var.get() not in ("real", "imag", "abs"):
+            self.comp_var.set("abs")
+        frame = ttk.Frame(self.controls)
+        frame.pack(side=tk.LEFT, padx=(0, 20))
+        for comp in ("real", "imag", "abs"):
+            ttk.Radiobutton(
+                frame, text=comp, variable=self.comp_var, value=comp,
+                command=self.redraw,
+            ).pack(side=tk.LEFT)
+
+    def _add_axis_buttons(self, data: np.ndarray) -> None:
+        """Ось 1D: ``index`` всегда, ``rho``/``psi`` — если совпали по длине."""
+        names = ["index"] + [
+            name for name, (values, _units) in self._axes.items()
+            if values is not None and len(values) == len(data)
+        ]
+        if self.axis_var.get() not in names:
             self.axis_var.set("index")
+        frame = ttk.Frame(self.controls)
+        frame.pack(side=tk.LEFT)
+        ttk.Label(frame, text="ось:").pack(side=tk.LEFT)
+        for name in names:
+            ttk.Radiobutton(
+                frame, text=name, variable=self.axis_var, value=name,
+                command=self.redraw,
+            ).pack(side=tk.LEFT)
+
+    # --- 1D ---------------------------------------------------------------
 
     def _draw_1d(self, data: np.ndarray, path: str, attrs: dict) -> None:
         """Рисует 1D: вещественный — линией, комплексный — заглушкой."""
