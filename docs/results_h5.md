@@ -11,12 +11,20 @@
   из оригинала, а уточняет её по факту.
 - Смежный формат: [`docs/elmfire_h5.md`](elmfire_h5.md).
 
-Проверенные источники данных (формат `0.94`):
+Проверенные источники данных:
 
-- `data/wave2d/FT-2_LH_smoke/2026-09-28_15-30-49/tasks/Nr+051/results.h5`;
-- `data/wave2d/FT-2_LH_smoke_nphi/2026-09-28_15-31-35/results.h5` — **общий**
-  файл серии (5 мод);
-- `data/wave2d/FT-2_LH_smoke_nphi/2026-09-28_15-31-35/tasks/<nphi>/results.h5`.
+- `0.94` (старая схема, `/manifest`):
+  - `data/wave2d/FT-2_LH_smoke/2026-09-28_15-30-49/tasks/Nr+051/results.h5`;
+  - `data/wave2d/FT-2_LH_smoke_nphi/2026-09-28_15-31-35/results.h5` — **общий**
+    файл серии (5 мод);
+  - `data/wave2d/FT-2_LH_smoke_nphi/2026-09-28_15-31-35/tasks/<nphi>/results.h5`.
+- `0.95` (новая схема, `/report`; см. §12):
+  - `data/wave2d/FT-2_LH_nphi_Nr401/2026-10-13_11-50-46/results.h5` — общий
+    файл серии, `/power_balance/nphi*` (5 мод), `/report/{build,system_info}`;
+  - `data/wave2d/FT-2_LH_nphi_smoke/2026-10-13_11-45-26/results.h5` — то же,
+    вложенный `/power_balance`;
+  - `data/wave2d/FT-2_LH_nphi_smoke/2026-10-13_11-40-54/results.h5` — ранняя
+    сборка `0.95`: `/power_balance` **плоская** (см. §12).
 
 ## 1. Версия формата и поддержка
 
@@ -29,6 +37,10 @@
   `src.wave2d.schema.UnsupportedFormatError` («формат не поддерживается»).
   Проверка — `ensure_supported()` / `ensure_supported_path()` / `open_results()`
   в `src/wave2d/schema.py`.
+- Продюсер перешёл на **`0.95`** (см. `hdf5_schema.md`): `MIN_FORMAT = (0, 94)`
+  пропускает обе версии. Отличия `0.95` для ридера — в §12; кратко: `/manifest`
+  → `/report`, добавлены `/power_balance/nphi*` и run-level `/report/build`,
+  `/report/system_info`.
 - Все 2D-поля хранятся как `(Nr, Msmax)`: ось 0 — радиальная (`rho`), ось 1 —
   полоидальная (`theta`). Пример: `f['grid/X'][ir, itheta]`.
 - Типы: вещественные — `float64`, комплексные — `complex128`.
@@ -123,7 +135,8 @@ def nphi_group_name(nphi: int) -> str:
 
 ```
 /
-├── manifest/              только атрибуты: system, toolchain, run
+├── report/                провенанс (0.95; в 0.94 — manifest/): toolchain +
+│                          <task_name>/{system, run, duration, status} + атрибуты
 ├── input/                 только атрибуты: w2grid, plasma, temper, kngrid, dens
 ├── grid/                  rho (Nr,), psi (Nr,), X (Nr,Msmax), Y (Nr,Msmax)
 ├── geometry/              Jc, Nh, R, cosb, sinb
@@ -134,6 +147,10 @@ def nphi_group_name(nphi: int) -> str:
 │   ├── dielectric/        L, aMX, aTT, eps, eta, gee          (complex128)
 │   ├── resonance/         w0_wce, w0_wlh, w0_wpe, w0_wuh, Xcutoff_at_0, PolRes_at_0
 │   └── wkb/               Nrho1, Nrho2                         (complex128)
+├── power_balance/         (0.95) радиальный энергобаланс; ср. §12
+│   └── nphi±XXX/          attr nphi; psi, Sflux, dSflux_dpsi, dP*_dpsi,
+│                          dV, dP_tube, p_ld, p_tt, p_mx  (каждый (Nr,))
+│                          (в ранних 0.95 — плоская группа без nphi*)
 └── fields/
     └── nphi±XXX/          attr nphi int32; Ex, Ey, Ez (complex128); Ea (float64)
 ```
@@ -291,3 +308,42 @@ with open_results(path) as f:                       # проверяет format_
   `rho(cm)` — при интеграле следить за множителем 100 (блокер P0).
 - **Мусор на оси в `plasma/params`** — воспроизводится ли во всех прогонах или
   это артефакт конкретной сборки?
+
+## 12. Схема 0.95: новое для ридера
+
+Канон продюсера обновлён до `0.95` (см. [`hdf5_schema.md`](hdf5_schema.md)).
+Изменения аддитивные — старые `0.94`-файлы читаются по-прежнему.
+
+- **`/manifest` → `/report`.** Общий `/report/toolchain` (компилятор, HDF5,
+  флаги; `git_*` дописывает лаунчер) и по группе на задачу
+  `/report/<task_name>/{system,run,duration,status}` плюс атрибуты задачи
+  (`node`, `start_time`, `slurm_job_id`, `status`, `exit_code`,
+  `total_time_sec`). Глобальной `/report/system` больше нет: окружение
+  (`system`, `hostname`, `cpu_model`, новые `*_num_threads`, `omp_max_threads`)
+  живёт под задачей, т.к. задачи серии могут считаться на разных узлах.
+  `duration`/`status` — времена и статусы шагов (`FieldSolver`,
+  `PowerBalance`, `poloidal_field_2d`).
+- **`/power_balance/nphi*`.** 1D радиальный энергобаланс моды — по группе на
+  `nphi`, как `/fields`. Атрибуты: `nphi`, `Pabs_kW`, `Pinp_kW`, `discrepancy`.
+  Датасеты длины `Nr`: `psi` (дубль `/grid/psi`), `Sflux`, `dSflux_dpsi` (kW),
+  `dPld_dpsi`/`dPttmp_dpsi`/`dPmix_dpsi`/`dPtot_dpsi` (kW), `dV` (cm³),
+  `dP_tube` (kW), `p_ld`/`p_tt`/`p_mx` (kW/cm³). `ir = 0` занулена.
+- ⚠️ **Раскладка `/power_balance` нестабильна внутри `0.95`.** В более новых
+  сборках (напр. `…/2026-10-13_11-45-26`, `…/11-50-46`) это группы
+  `/power_balance/nphi*` (по моде, как `/fields`; `nphi` — атрибут подгруппы).
+  В ранней сборке (`…/2026-10-13_11-40-54`) группа **плоская**: датасеты лежат
+  прямо в `/power_balance`, а `nphi`/`Pabs_kW`/… — атрибуты самой группы (одна
+  мода на файл; run-level не объединяет моды и хранит базовую — `nphi+122`).
+  Ридеру: сначала определить, группа или датасет у `/power_balance/nphi*`;
+  если `nphi*` нет — читать атрибуты `/power_balance` как одиночную моду.
+- **Run-level группы** (только в общем файле прогона): `/report/build` —
+  паспорт сборки из `bin/build-info.json` (включая `*_sha256` бинарников), и
+  `/report/system_info` — машина и Python лаунчера (как в `system_info.ini`).
+- Сборку общего файла канон называет `merge_results` (бывш.
+  `merge_nphi_results`); правило «данные объединяются только для серии по
+  `nphi`» сохраняется, для прочих серий общий файл — report-only.
+- **Чтение.** Версия `0.95` проходит проверку `MIN_FORMAT = (0, 94)`.
+  Единственная зависимость от пути — провенанс: `H5Reader.manifest()` ищет
+  `/report`, затем откатывается на `/manifest`; GUI-панель (`src/wave2d/app.py`)
+  проверяет оба пути. Поля (`/grid`, `/fields/*`), `/plasma/*` и `/input/*`
+  без изменений.

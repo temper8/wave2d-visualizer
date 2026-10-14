@@ -177,8 +177,11 @@ class H5Reader:
         return self.attrs_recursive(start_path)
 
     def manifest(self) -> dict[str, dict[str, Any]]:
-        """Атрибуты ``/manifest`` (рекурсивно) — провенанс запуска."""
-        return self.attrs_recursive("/manifest")
+        """Атрибуты провенанса: ``/report`` (>= 0.95) или ``/manifest`` (0.94)."""
+        for path in ("/report", "/manifest"):
+            if path in self.file:
+                return self.attrs_recursive(path)
+        return {}
 
     # --- служебное -------------------------------------------------------
 

@@ -393,11 +393,16 @@ class W2DNavigatorApp:
         lines = [f"Файл  : {path}", f"Размер: {size_mb:.2f} MB", ""]
         try:
             with H5Reader(path) as reader:
-                if reader.contains("/manifest"):
+                # Провенанс: в 0.95 группа /report, в 0.94 — /manifest.
+                provenance = next(
+                    (p for p in ("/report", "/manifest") if reader.contains(p)),
+                    None,
+                )
+                if provenance is not None:
                     manifest = reader.manifest()
                     if manifest:
-                        lines.append("manifest:")
-                        lines.extend(self._format_params(manifest, "/manifest"))
+                        lines.append(f"{provenance.strip('/')}:")
+                        lines.extend(self._format_params(manifest, provenance))
                         lines.append("")
                 if reader.contains("/input"):
                     lines.append("input:")
