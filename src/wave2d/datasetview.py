@@ -11,7 +11,8 @@
 
 Виджет владеет переключателями ``(R,Z)/(rho,theta)``, ``real/imag/abs``,
 холстом matplotlib и ``NavigationToolbar``. Окно-оркестратор лишь передаёт
-готовый :class:`Selection`.
+готовый :class:`Selection`. Сама отрисовка датасетов — в
+:mod:`src.wave2d.renderers` (без Tk).
 """
 
 from __future__ import annotations
@@ -28,6 +29,8 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 
 import tkinter as tk
 from tkinter import ttk
+
+from src.wave2d.renderers import draw_1d, draw_2d
 
 
 @dataclass
@@ -173,10 +176,18 @@ class DatasetView(ttk.Frame):
                 ha="center", va="center", transform=self.ax.transAxes,
             )
         elif mode == "1d":
-            self.ax.plot(data)
-            self.ax.set_title(path, fontsize=8)
+            draw_1d(self.ax, data, title=path)
         elif mode == "2d":
-            self._draw_2d(path, data)
+            self._colorbar = draw_2d(
+                self.ax,
+                self.fig,
+                data,
+                title=path,
+                view=self.view_var.get(),
+                R=self.R,
+                Z=self.Z,
+                comp=self.comp_var.get(),
+            )
 
         self.canvas.draw_idle()
 
@@ -196,36 +207,6 @@ class DatasetView(ttk.Frame):
         if data.ndim == 2:
             return "2d", ""
         return "message", f"{path}\nshape={data.shape}"
-
-    def _draw_2d(self, title: str, data: np.ndarray) -> None:
-        """Рисует 2D-датасет: ``(R,Z)`` при совпадении формы, иначе ``(rho,theta)``."""
-        arr = self._component(data)
-        use_rz = (
-            self.view_var.get() == "rz"
-            and self.R is not None
-            and self.R.shape == data.shape
-        )
-        if use_rz:
-            mesh = self.ax.pcolormesh(self.R, self.Z, arr, shading="gouraud")
-            self.ax.set_aspect("equal")
-            self.ax.set_title(f"{title} (R,Z)", fontsize=8)
-        else:
-            mesh = self.ax.imshow(
-                arr, origin="lower", aspect="equal", interpolation="none"
-            )
-            self.ax.set_title(f"{title} (rho,theta)", fontsize=8)
-        self._colorbar = self.fig.colorbar(mesh, ax=self.ax, pad=0.02)
-
-    def _component(self, data: np.ndarray) -> np.ndarray:
-        """Для комплексных данных — выбранная составляющая."""
-        if np.iscomplexobj(data):
-            comp = self.comp_var.get()
-            if comp == "real":
-                return data.real
-            if comp == "imag":
-                return data.imag
-            return np.abs(data)
-        return data
 
     # --- атрибуты --------------------------------------------------------
 
