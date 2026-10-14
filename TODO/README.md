@@ -6,7 +6,8 @@
 
 Имя открытой задачи начинается с префикса приоритета — `p0-`…`p9-`, чтобы
 сортировка по имени давала порядок работ (**меньше номер — выше приоритет**).
-Файлы в `done/` без префикса (это архив).
+Закрытые задачи переносятся в `done/`, где вместо приоритета в имени стоит
+префикс даты закрытия `ГГГГ-ММ-ДД-` (это архив).
 
 ## Формат задачи
 
@@ -24,7 +25,7 @@
 Шкала `P0`…`P9`, меньше номер — выше приоритет. Ориентир:
 
 - **P0–P2** — высокий: фундамент и архитектура, мешающие работе
-  (`W2DViewer`, `PolarGrid`/`Field2D`, вынос `Wave2DResults`).
+  (`PolarGrid`/`Field2D`, вынос `Wave2DResults`).
 - **P3–P5** — средний: инструменты и данные (флаг `--latest`, `catalog.json`,
   тесты).
 - **P6–P8** — низкий: структура папок, dimension scales, README, линтер,
@@ -37,7 +38,6 @@
 
 | Файл | Приоритет | Статус | Кратко |
 |---|---|---|---|
-| [p0-w2dviewer-split-into-tree-widget-and-dataset-view.md](p0-w2dviewer-split-into-tree-widget-and-dataset-view.md) | P0 | todo | Разбить `W2DViewer` на оркестратор + `H5TreeView` + `DatasetView` |
 | [p1-extract-common-domain-model-polargrid-field2d-timeseries.md](p1-extract-common-domain-model-polargrid-field2d-timeseries.md) | P1 | todo | `src/common/`: `PolarGrid`, `Field2D`, `FieldTimeSeries`, `units.py` |
 | [p2-extract-wave2dresults-from-render-and-utils.md](p2-extract-wave2dresults-from-render-and-utils.md) | P2 | todo | Вынести `Wave2DResults` из `w2d_render.py`/`utils.py` |
 | [p3-add-latest-flag-and-remove-hardcoded-wave2d-case.md](p3-add-latest-flag-and-remove-hardcoded-wave2d-case.md) | P3 | todo | Флаг `--latest`, убрать хардкод кейса |

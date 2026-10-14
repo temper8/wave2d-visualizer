@@ -3,7 +3,7 @@
 - **Приоритет:** P3
 - **Статус:** todo
 - **Зависит от:** — (рендереры уже вынесены в `src/wave2d/renderers.py` задачей
-  [p0-w2dviewer-split-into-tree-widget-and-dataset-view.md](p0-w2dviewer-split-into-tree-widget-and-dataset-view.md))
+  [done/2026-10-14-w2dviewer-split-into-tree-widget-and-dataset-view.md](done/2026-10-14-w2dviewer-split-into-tree-widget-and-dataset-view.md))
 - **Файлы:** `src/wave2d/datasetview.py`, `src/wave2d/renderers.py`,
   `src/wave2d/viewer.py`
 

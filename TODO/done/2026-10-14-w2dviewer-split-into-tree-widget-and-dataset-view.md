@@ -1,7 +1,7 @@
 # W2DViewer: разбиение на виджеты
 
 - **Приоритет:** P0
-- **Статус:** todo
+- **Статус:** done
 - **Зависит от:** —
 - **Файлы:** `src/wave2d/viewer.py`, `src/wave2d/h5tree.py` (новый),
   `src/wave2d/datasetview.py` (новый), `src/common/h5reader.py`
@@ -52,4 +52,4 @@
 - [x] **F.** Вынести рендереры в отдельный модуль — `src/wave2d/renderers.py`
       (`component`/`draw_2d`/`draw_1d`), поведение 1:1. Расширение 1D (оси,
       подписи, несколько кривых) вынесено в отдельную задачу —
-      [p3-extend-1d-dataset-view-with-axes-and-multiple-curves.md](p3-extend-1d-dataset-view-with-axes-and-multiple-curves.md).
+      [../p3-extend-1d-dataset-view-with-axes-and-multiple-curves.md](../p3-extend-1d-dataset-view-with-axes-and-multiple-curves.md).

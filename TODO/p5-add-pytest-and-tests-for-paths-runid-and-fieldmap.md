@@ -2,7 +2,7 @@
 
 - **Приоритет:** P5
 - **Статус:** todo
-- **Зависит от:** [p0-w2dviewer-split-into-tree-widget-and-dataset-view.md](p0-w2dviewer-split-into-tree-widget-and-dataset-view.md)
+- **Зависит от:** [done/2026-10-14-w2dviewer-split-into-tree-widget-and-dataset-view.md](done/2026-10-14-w2dviewer-split-into-tree-widget-and-dataset-view.md)
 - **Файлы:** `pyproject.toml`, `tests/` (новый)
 
 ## Контекст
