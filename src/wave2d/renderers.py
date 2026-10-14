@@ -16,6 +16,7 @@ import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.colorbar import Colorbar
 from matplotlib.figure import Figure
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 def component(data: np.ndarray, mode: str) -> np.ndarray:
@@ -58,7 +59,12 @@ def draw_2d(
     else:
         mesh = ax.imshow(arr, origin="lower", aspect="equal", interpolation="none")
         ax.set_title(f"{title} (rho,theta)", fontsize=8)
-    return fig.colorbar(mesh, ax=ax, pad=0.02)
+    # Цветовая шкала — на собственной оси справа от картинки. Через
+    # ``fig.colorbar(ax=...)`` нельзя: он выставляет ``anchor=(1, 0.5)`` и при
+    # ``aspect="equal"`` прижимает узкую картинку к правому краю. ``append_axes``
+    # держит шкалу вплотную к осям, где бы те ни оказались (size/pad — в дюймах).
+    cax = make_axes_locatable(ax).append_axes("right", size=0.22, pad=0.08)
+    return fig.colorbar(mesh, cax=cax)
 
 
 def _draw_line(

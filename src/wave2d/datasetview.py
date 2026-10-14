@@ -132,6 +132,8 @@ class DatasetView(ttk.Frame):
         self.fig, self.ax = plt.subplots(
             figsize=(6.5, 5.5), layout="constrained"
         )
+        # Больше воздуха по краям фигуры (w_pad/h_pad — в дюймах).
+        self.fig.get_layout_engine().set(w_pad=0.12, h_pad=0.12)
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
         self.canvas_widget = self.canvas.get_tk_widget()
 
