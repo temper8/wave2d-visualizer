@@ -34,7 +34,7 @@
 - [x] **A.** `H5Reader.kind(path)` / `is_group(path)` в `src/common/h5reader.py`;
       переиспользовать `kind()` внутри `walk()`, чтобы viewer/дерево не
       импортировали `h5py`.
-- [ ] **B.** `src/wave2d/h5tree.py` — `H5TreeView(ttk.Frame)`: дерево + скроллбар
+- [x] **B.** `src/wave2d/h5tree.py` — `H5TreeView(ttk.Frame)`: дерево + скроллбар
       + `populate(reader)` (через `H5Reader.walk`), колбэк `on_select(path)`;
       корень файла не показывается (как сейчас).
 - [ ] **C.** `src/wave2d/datasetview.py` — `DatasetView(ttk.Frame)` +
