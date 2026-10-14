@@ -19,4 +19,4 @@
       GUI-логика в `src/wave2d/`.
 
 Дальнейшее развитие — в
-[p1-w2dviewer-split-into-tree-widget-and-dataset-view.md](../p1-w2dviewer-split-into-tree-widget-and-dataset-view.md).
+[p0-w2dviewer-split-into-tree-widget-and-dataset-view.md](../p0-w2dviewer-split-into-tree-widget-and-dataset-view.md).

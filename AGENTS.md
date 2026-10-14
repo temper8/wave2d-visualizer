@@ -34,7 +34,7 @@ Python-комплекс для конвертации, 2D-визуализаци
 
 **Единственное пересечение** — интеграл перекрытия
 `∫ f_ELMFIRE(t,ρ,θ)·Ea_Wave2D(ρ,θ)·ρ dρ dθ` в `tools/integrator.py`. Его целевое место —
-отдельный слой `src/coupling/`. См. `TODO/p3-elmfire-overlap-integral-and-fluctuations-shelved.md`.
+отдельный слой `src/coupling/`. См. `TODO/p9-elmfire-overlap-integral-and-fluctuations-shelved.md`.
 
 ## Окружение и команды
 
@@ -83,7 +83,7 @@ elmfire_convert.py           # точка входа конвертации ELMF
 tools/elmfire_reader.py      # инспекция .dat + рендер кадров в derived/frames
 tools/count_points_per_index.py  # точек на временной индекс (derived)
 tools/integrator_test_pi.py  # проверка интеграла единичных полей (сходимость к π)
-tools/integrator.py          # пример интеграла перекрытия (отложено, см. TODO/p3-elmfire-overlap-integral-and-fluctuations-shelved.md)
+tools/integrator.py          # пример интеграла перекрытия (отложено, см. TODO/p9-elmfire-overlap-integral-and-fluctuations-shelved.md)
 tools/make_icon.py           # генератор иконки w2d_app (варианты a/b/c)
 w2d_render.py                # 2D-визуализация полей Wave2D
 w2d_viewer.py                # точка входа GUI-просмотрщика (логика в src/wave2d/)
@@ -128,7 +128,7 @@ data/
   `uv run elmfire_convert.py WagD`). `w2d_render.py` по умолчанию берёт свежий
   прогон `FT-2_LH_smoke_nphi` (`wave2d_latest("FT-2_LH_smoke_nphi")`); ELMFIRE — `WagD`.
 - Всё, что генерирует код (PNG, MP4, интегралы), писать **только** в `derived/`.
-- `catalog.json` и sidecar `run.json` пока **не реализованы** — см. `TODO/p1-add-catalog-json-and-run-sidecar-with-checksums.md`.
+- `catalog.json` и sidecar `run.json` пока **не реализованы** — см. `TODO/p4-add-catalog-json-and-run-sidecar-with-checksums.md`.
 - Wave2D: кейсы (`case_id`: `FT-2_LH_smoke`, `FT-2_LH_smoke_nphi`, `FT2`, ...) —
   подкаталоги `data/wave2d/`; внутри кейса — прогоны `<stamp>`
   (`FT-2_LH_smoke_nphi/<stamp>/`). Legacy-плоско (`Globus/results.h5`) поддержано.
@@ -139,7 +139,7 @@ data/
   (см. `TODO/`). Всё реэкспортируется из `paths.py`, обёртки `wave2d_*` сохранены.
 - ELMFIRE: `WagD`.
 - Скрипты пока вызывают `wave2d_results(run_id)` со старым `run_id`; переход на
-  `run_id = "<case_id>/<stamp>"` и флаг `--latest` — в `TODO/p1-add-latest-flag-and-remove-hardcoded-wave2d-case.md`.
+  `run_id = "<case_id>/<stamp>"` и флаг `--latest` — в `TODO/p3-add-latest-flag-and-remove-hardcoded-wave2d-case.md`.
 
 ## Формат данных
 
@@ -167,7 +167,7 @@ data/
 1. **Единицы.** ELMFIRE `rho(cm)` — сантиметры; Wave2D, похоже, метры.
    Не строишь интеграл, пока не убедился в согласованности единиц (множитель 100).
 2. **`get_interpolator` (непериодический) содержит баг** с `endpoint=True`.
-   Использовать `get_periodic_interpolator`. Подробности — в `TODO/p3-elmfire-overlap-integral-and-fluctuations-shelved.md`.
+   Использовать `get_periodic_interpolator`. Подробности — в `TODO/p9-elmfire-overlap-integral-and-fluctuations-shelved.md`.
 3. **Legacy 0.9: `coord/rho` длиннее `Nr`** (Globus 397 ≠ 361, FT2 56 ≠ 51).
    Первые `Nr` — физическая сетка, остальное — margin; в 0.94 (`Nrmargin` удалён)
    `grid/rho` уже длины `Nr`. Не используй `coord/rho` целиком.
@@ -186,6 +186,6 @@ data/
 - **P1** — баг интерполятора, вынос `src/common/`, адаптеры, тесты.
 - **P2/P3** — структура папок, pytest, gitignore бинарников, линтер.
 
-Актуальный список задач — в `TODO/`; ELMFIRE-задачи (отложены) — в `TODO/p3-elmfire-overlap-integral-and-fluctuations-shelved.md`.
+Актуальный список задач — в `TODO/`; ELMFIRE-задачи (отложены) — в `TODO/p9-elmfire-overlap-integral-and-fluctuations-shelved.md`.
 Перед крупным рефакторингом сверяйся с ним
 и предлагай инкрементальные шаги, не ломающие текущие скрипты.

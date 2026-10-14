@@ -1,8 +1,8 @@
 # pytest и тесты: пути, run_id, чистые части viewer
 
-- **Приоритет:** P2
+- **Приоритет:** P5
 - **Статус:** todo
-- **Зависит от:** [p1-w2dviewer-split-into-tree-widget-and-dataset-view.md](p1-w2dviewer-split-into-tree-widget-and-dataset-view.md)
+- **Зависит от:** [p0-w2dviewer-split-into-tree-widget-and-dataset-view.md](p0-w2dviewer-split-into-tree-widget-and-dataset-view.md)
 - **Файлы:** `pyproject.toml`, `tests/` (новый)
 
 ## Контекст

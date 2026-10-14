@@ -1,8 +1,8 @@
 # Оценить разделение репозиториев
 
-- **Приоритет:** P3
+- **Приоритет:** P8
 - **Статус:** todo
-- **Зависит от:** [p2-reorganize-src-into-apps-and-viz-packages.md](p2-reorganize-src-into-apps-and-viz-packages.md)
+- **Зависит от:** [p6-reorganize-src-into-apps-and-viz-packages.md](p6-reorganize-src-into-apps-and-viz-packages.md)
 - **Файлы:** структура репозитория
 
 ## Контекст

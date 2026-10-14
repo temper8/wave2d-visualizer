@@ -2,7 +2,7 @@
 
 - **Приоритет:** P1
 - **Статус:** todo
-- **Зависит от:** [p1-extract-wave2dresults-from-render-and-utils.md](p1-extract-wave2dresults-from-render-and-utils.md)
+- **Зависит от:** [p2-extract-wave2dresults-from-render-and-utils.md](p2-extract-wave2dresults-from-render-and-utils.md)
 - **Файлы:** `src/common/` (новые модули), `src/utils.py`
 
 ## Контекст
@@ -24,6 +24,6 @@
       `FieldTimeSeries`.
 - [ ] `regular_polar_grid()` — построение регулярной сетки `(rho, θ)`.
 - [ ] `src/common/units.py` — явные константы единиц (см. блокеры физики в
-      [p3-elmfire-overlap-integral-and-fluctuations-shelved.md](p3-elmfire-overlap-integral-and-fluctuations-shelved.md)):
+      [p9-elmfire-overlap-integral-and-fluctuations-shelved.md](p9-elmfire-overlap-integral-and-fluctuations-shelved.md)):
       убрать неявные допущения о см/м.
 - [ ] Не ломать текущие скрипты; перевод адаптеров — отдельными шагами.

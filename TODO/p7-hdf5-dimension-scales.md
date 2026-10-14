@@ -1,6 +1,6 @@
 # Привязать dimension scales к осям grid
 
-- **Приоритет:** P2
+- **Приоритет:** P7
 - **Статус:** todo
 - **Зависит от:** —
 - **Файлы:** producer `results.h5`, `docs/hdf5_schema.md`, `src/wave2d/schema.py`

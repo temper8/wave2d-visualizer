@@ -1,6 +1,6 @@
 # Разнести src/ на apps/ и viz/
 
-- **Приоритет:** P2
+- **Приоритет:** P6
 - **Статус:** todo
 - **Зависит от:** [p1-extract-common-domain-model-polargrid-field2d-timeseries.md](p1-extract-common-domain-model-polargrid-field2d-timeseries.md)
 - **Файлы:** `src/` (структура), точки входа в корне
@@ -27,5 +27,5 @@ src/
       canvas/teardown для обоих viewer'ов).
 - [ ] Выделить `src/apps/` — тонкие точки входа; корневые скрипты остаются
       обёртками.
-- [ ] Согласовать с [p3-elmfire-overlap-integral-and-fluctuations-shelved.md](p3-elmfire-overlap-integral-and-fluctuations-shelved.md)
+- [ ] Согласовать с [p9-elmfire-overlap-integral-and-fluctuations-shelved.md](p9-elmfire-overlap-integral-and-fluctuations-shelved.md)
       (слой `coupling/`).
