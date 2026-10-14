@@ -43,7 +43,7 @@
       узла), **message** (нет выбора / неподдерживаемая размерность).
       Переключатели `(R,Z)/(rho,θ)`, `real/imag/abs` и `NavigationToolbar` —
       внутри `DatasetView`.
-- [ ] **D.** `src/wave2d/viewer.py` — оставить оркестрацию: `H5Reader`,
+- [x] **D.** `src/wave2d/viewer.py` — оставить оркестрацию: `H5Reader`,
       `Panedwindow`, связка `H5TreeView` + `DatasetView`, `on_closing`. Убрать из
       файла `import h5py` и `pyplot`. Поведение: есть 2D/1D → атрибуты скрыты;
       нет данных (группа/ошибка) → режим attrs.
