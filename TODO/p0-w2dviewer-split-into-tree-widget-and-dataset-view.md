@@ -49,5 +49,7 @@
       нет данных (группа/ошибка) → режим attrs.
 - [x] **E.** Smoke вручную: `uv run w2d_viewer.py`, `uv run w2d_app.py`. После
       появления `pytest` — тесты на `Selection` и диспетчер режимов (без Tk).
-- [ ] **F.** (позже) Расширить 1D (несколько кривых, подписи осей); вынести
-      рендереры в отдельный модуль, если `datasetview.py` разрастётся.
+- [x] **F.** Вынести рендереры в отдельный модуль — `src/wave2d/renderers.py`
+      (`component`/`draw_2d`/`draw_1d`), поведение 1:1. Расширение 1D (оси,
+      подписи, несколько кривых) вынесено в отдельную задачу —
+      [p3-extend-1d-dataset-view-with-axes-and-multiple-curves.md](p3-extend-1d-dataset-view-with-axes-and-multiple-curves.md).
