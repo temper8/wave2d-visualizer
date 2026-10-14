@@ -61,10 +61,73 @@ def draw_2d(
     return fig.colorbar(mesh, ax=ax, pad=0.02)
 
 
-def draw_1d(ax: Axes, data: np.ndarray, *, title: str) -> None:
-    """Рисует 1D-датасет одной линией (против индекса).
+def _draw_line(
+    ax: Axes,
+    y: np.ndarray,
+    *,
+    title: str,
+    x: np.ndarray | None,
+    xlabel: str,
+    ylabel: str,
+) -> None:
+    """Общая отрисовка 1D-линии: ось ``x`` (или индекс) и подписи.
 
-    Расширение (оси, подписи, несколько кривых) — отдельная задача F1.
+    ``x`` используется, только если его длина совпадает с ``len(y)``; иначе
+    линия строится против индекса, а ``xlabel`` заменяется на ``"index"``.
     """
-    ax.plot(data)
+    if x is not None and len(x) == len(y):
+        ax.plot(x, y)
+    else:
+        ax.plot(y)
+        xlabel = "index"
     ax.set_title(title, fontsize=8)
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+
+
+def draw_1d(
+    ax: Axes,
+    data: np.ndarray,
+    *,
+    title: str,
+    x: np.ndarray | None = None,
+    xlabel: str = "index",
+    ylabel: str = "",
+) -> None:
+    """Рисует вещественный 1D-датасет одной линией.
+
+    ``x`` — выбранная ось (``rho``/``psi``); если её длина не совпадает с
+    ``len(data)``, линия строится против индекса. ``xlabel`` (ось) и
+    ``ylabel`` (имя датасета + ``units``) — готовые подписи от вызывающего.
+    """
+    y = np.real(data) if np.iscomplexobj(data) else data
+    _draw_line(ax, y, title=title, x=x, xlabel=xlabel, ylabel=ylabel)
+
+
+def draw_1d_complex(
+    ax: Axes,
+    data: np.ndarray,
+    *,
+    title: str,
+    x: np.ndarray | None = None,
+    xlabel: str = "index",
+    ylabel: str = "",
+    comp: str = "abs",
+) -> None:
+    """Рисует комплексный 1D-датасет — **заглушка**: одна составляющая.
+
+    Пока выводится только ``component(data, comp)`` (по умолчанию ``abs``).
+    Полноценный режим (``real``/``imag``/``abs`` линиями + легенда) —
+    отдельный шаг задачи
+    ``TODO/p3-extend-1d-dataset-view-with-axes-and-multiple-curves.md``.
+    """
+    _draw_line(
+        ax,
+        component(data, comp),
+        title=title,
+        x=x,
+        xlabel=xlabel,
+        ylabel=ylabel,
+    )

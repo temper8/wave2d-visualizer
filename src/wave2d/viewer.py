@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 import tkinter as tk
@@ -18,7 +20,14 @@ from tkinter import ttk
 from src.common.h5reader import H5Reader
 from src.wave2d.datasetview import DatasetView, Selection
 from src.wave2d.h5tree import H5TreeView
-from src.wave2d.schema import GRID_X, GRID_Y, format_version_of, open_results
+from src.wave2d.schema import (
+    GRID_PSI,
+    GRID_RHO,
+    GRID_X,
+    GRID_Y,
+    format_version_of,
+    open_results,
+)
 
 
 class W2DViewer:
@@ -56,7 +65,12 @@ class W2DViewer:
         self.tree_view = H5TreeView(paned, on_select=self.on_select)
         self.tree_view.populate(self.reader)
 
-        self.dataset_view = DatasetView(paned, coords=self._load_coords())
+        self.dataset_view = DatasetView(
+            paned,
+            coords=self._load_coords(),
+            rho=self._load_axis(GRID_RHO),
+            psi=self._load_axis(GRID_PSI),
+        )
 
         paned.add(self.tree_view, weight=1)
         paned.add(self.dataset_view, weight=3)
@@ -66,6 +80,15 @@ class W2DViewer:
         try:
             if self.reader.contains(GRID_X) and self.reader.contains(GRID_Y):
                 return self.reader.array(GRID_X), self.reader.array(GRID_Y)
+        except Exception:
+            pass
+        return None
+
+    def _load_axis(self, path: str) -> tuple[np.ndarray, Any] | None:
+        """1D-ось ``(массив, units)`` из файла или ``None`` (нет/ошибка)."""
+        try:
+            if self.reader.contains(path):
+                return self.reader.array(path), self._attrs(path).get("units")
         except Exception:
             pass
         return None

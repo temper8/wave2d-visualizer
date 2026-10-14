@@ -4,7 +4,9 @@
 
 - **2D** — изображение датасета: ``(R,Z)`` (если есть координаты) или
   ``(rho,theta)``, с выбором составляющей ``real``/``imag``/``abs`` и colorbar;
-- **1D** — одна линия (пока минимум);
+- **1D** — линия против оси ``index``/``rho``/``psi`` (``rho``/``psi`` —
+  если переданы и совпадают по длине) с подписями из атрибута ``units``;
+  комплексные данные — отдельным рендером-заглушкой (одна составляющая);
 - **attrs** — текст атрибутов узла (когда рисовать нечего: выбрана группа);
 - **message** — сообщение, если ничего не выбрано или размерность не
   поддерживается.
@@ -30,7 +32,16 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 import tkinter as tk
 from tkinter import ttk
 
-from src.wave2d.renderers import draw_1d, draw_2d
+from src.wave2d.renderers import draw_1d, draw_1d_complex, draw_2d
+
+
+def _units_text(units: Any) -> str:
+    """Атрибут ``units`` как строка (bytes декодируются), иначе пусто."""
+    if units is None:
+        return ""
+    if isinstance(units, bytes):
+        return units.decode("utf-8", "replace").strip()
+    return str(units).strip()
 
 
 @dataclass
@@ -55,12 +66,16 @@ class DatasetView(ttk.Frame):
         self,
         master,
         coords: tuple[np.ndarray, np.ndarray] | None = None,
+        rho: tuple[np.ndarray, Any] | None = None,
+        psi: tuple[np.ndarray, Any] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(master, **kwargs)
         self.R: np.ndarray | None = None
         self.Z: np.ndarray | None = None
         self.set_coords(coords)
+        self._axes: dict[str, tuple[np.ndarray, Any]] = {}
+        self.set_axes(rho, psi)
         self._colorbar = None
         self._attr_expanded: bool | None = None
         self._selection: Selection | None = None
@@ -80,6 +95,24 @@ class DatasetView(ttk.Frame):
             self.R = self.Z = None
         else:
             self.R, self.Z = coords
+
+    def set_axes(
+        self,
+        rho: tuple[np.ndarray, Any] | None = None,
+        psi: tuple[np.ndarray, Any] | None = None,
+    ) -> None:
+        """Задаёт 1D-оси как пары ``(массив, units)`` для ``rho`` и/или ``psi``.
+
+        ``None`` — оси нет (или её данные не прочитались): в переключателе
+        осей она будет недоступна, отрисовка пойдёт против индекса.
+        """
+        self._axes = {}
+        if rho is not None:
+            self._axes["rho"] = rho
+        if psi is not None:
+            self._axes["psi"] = psi
+        if hasattr(self, "_axis_buttons"):
+            self._sync_axis_buttons()
 
     def _build(self) -> None:
         """Создаёт переключатели, холст, атрибуты и toolbar."""
@@ -102,6 +135,20 @@ class DatasetView(ttk.Frame):
                 controls, text=comp, variable=self.comp_var, value=comp,
                 command=self.redraw,
             ).pack(side=tk.LEFT)
+
+        # Переключатель оси 1D: показывается только в 1D-режиме (см. _sync_axis_visibility).
+        self.axis_var = tk.StringVar(value="index")
+        self.axis_frame = ttk.Frame(controls)
+        self._axis_buttons: dict[str, ttk.Radiobutton] = {}
+        ttk.Label(self.axis_frame, text="ось:").pack(side=tk.LEFT)
+        for name in ("index", "rho", "psi"):
+            button = ttk.Radiobutton(
+                self.axis_frame, text=name, variable=self.axis_var,
+                value=name, command=self.redraw,
+            )
+            button.pack(side=tk.LEFT)
+            self._axis_buttons[name] = button
+        self._sync_axis_buttons()
 
         self.fig, self.ax = plt.subplots(figsize=(6.5, 5.5))
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
@@ -167,6 +214,7 @@ class DatasetView(ttk.Frame):
 
         mode, message = self._mode(selection, data, path)
         self._layout(expanded=(mode == "attrs"))
+        self._sync_axis_visibility(mode)
 
         if mode == "attrs":
             self._set_attr_text(self._attrs_text(attrs))
@@ -176,7 +224,7 @@ class DatasetView(ttk.Frame):
                 ha="center", va="center", transform=self.ax.transAxes,
             )
         elif mode == "1d":
-            draw_1d(self.ax, data, title=path)
+            self._draw_1d(data, path, attrs)
         elif mode == "2d":
             self._colorbar = draw_2d(
                 self.ax,
@@ -207,6 +255,65 @@ class DatasetView(ttk.Frame):
         if data.ndim == 2:
             return "2d", ""
         return "message", f"{path}\nshape={data.shape}"
+
+    # --- 1D ---------------------------------------------------------------
+
+    def _sync_axis_visibility(self, mode: str) -> None:
+        """Показывает переключатель оси только в 1D-режиме."""
+        managed = self.axis_frame.winfo_manager()
+        if mode == "1d" and not managed:
+            self.axis_frame.pack(side=tk.LEFT, padx=(12, 0))
+        elif mode != "1d" and managed:
+            self.axis_frame.pack_forget()
+
+    def _sync_axis_buttons(self) -> None:
+        """Доступные оси — активны (``index`` всегда), недоступные — disabled."""
+        for name, button in self._axis_buttons.items():
+            if name == "index" or name in self._axes:
+                button.state(["!disabled"])
+            else:
+                button.state(["disabled"])
+        if self.axis_var.get() != "index" and self.axis_var.get() not in self._axes:
+            self.axis_var.set("index")
+
+    def _draw_1d(self, data: np.ndarray, path: str, attrs: dict) -> None:
+        """Рисует 1D: вещественный — линией, комплексный — заглушкой."""
+        x, xlabel = self._active_axis(data)
+        ylabel = self._ylabel(path, attrs)
+        if np.iscomplexobj(data):
+            draw_1d_complex(
+                self.ax, data, title=path, x=x, xlabel=xlabel,
+                ylabel=ylabel, comp=self.comp_var.get(),
+            )
+        else:
+            draw_1d(
+                self.ax, data, title=path, x=x, xlabel=xlabel, ylabel=ylabel
+            )
+
+    def _active_axis(
+        self, data: np.ndarray
+    ) -> tuple[np.ndarray | None, str]:
+        """Выбранная ось ``(массив, подпись)`` или ``(None, "index")``.
+
+        Ось берётся только если она есть и её длина совпадает с ``len(data)``;
+        иначе рендер построит линию против индекса.
+        """
+        name = self.axis_var.get()
+        entry = self._axes.get(name)
+        if entry is None:
+            return None, "index"
+        values, units = entry
+        if values is None or len(values) != len(data):
+            return None, "index"
+        text = _units_text(units)
+        return values, (f"{name}, {text}" if text else name)
+
+    @staticmethod
+    def _ylabel(path: str, attrs: dict) -> str:
+        """Подпись Y: имя датасета + ``units`` (если есть)."""
+        name = path.rsplit("/", 1)[-1]
+        units = _units_text(attrs.get("units"))
+        return f"{name}, {units}" if units else name
 
     # --- атрибуты --------------------------------------------------------
 
