@@ -2,9 +2,10 @@
 
 - **Приоритет:** P2
 - **Статус:** todo
-- **Зависит от:** [p0-multi-select-and-multi-curve-1d-dataset-view.md](p0-multi-select-and-multi-curve-1d-dataset-view.md)
-  (общий слой наложения нескольких кривых) — **только для этапа реальной
-  отрисовки**, в MVP не нужен; желательно
+- **Зависит от:** реальная отрисовка вынесена в отдельные задачи — 1D:
+  [p0-multi-select-and-multi-curve-1d-dataset-view.md](p0-multi-select-and-multi-curve-1d-dataset-view.md),
+  2D: [p2-multiview-2d-grid-rendering.md](p2-multiview-2d-grid-rendering.md)
+  (в MVP не нужны); желательно
   [p4-add-catalog-json-and-run-sidecar-with-checksums.md](p4-add-catalog-json-and-run-sidecar-with-checksums.md)
   (человекочитаемые метки провенанса).
 - **Файлы:** `src/wave2d/multiview.py` (новый), `src/wave2d/datasetview.py`,
@@ -90,8 +91,11 @@
 
 ## Вне MVP (на потом)
 
-- **Реальная отрисовка:** 1D — overlay + легенда, 2D — сетка с общей
-  нормировкой (сейчас вкладка показывает текстовый список).
+- **Реальная отрисовка** — вынесена в отдельные задачи: 1D (overlay + легенда)
+  — [p0-multi-select-and-multi-curve-1d-dataset-view.md](p0-multi-select-and-multi-curve-1d-dataset-view.md);
+  2D (сетка с общей нормировкой) —
+  [p2-multiview-2d-grid-rendering.md](p2-multiview-2d-grid-rendering.md).
+  Сейчас вкладка показывает текстовый список.
 - Карты разности `A−B` и синхронизация курсоров/осей.
 - Открытие из Navigator (multi-select прогонов).
 - Drag&drop элементов между окнами, экспорт сравнения в `derived/`.

@@ -38,10 +38,11 @@
 
 | Файл | Приоритет | Статус | Кратко |
 |---|---|---|---|
-| [p0-multi-select-and-multi-curve-1d-dataset-view.md](p0-multi-select-and-multi-curve-1d-dataset-view.md) | P0 | todo | Несколько 1D-рядов в `DatasetView`: multi-select, наложение, легенда |
+| [p0-multi-select-and-multi-curve-1d-dataset-view.md](p0-multi-select-and-multi-curve-1d-dataset-view.md) | P0 | todo | Несколько 1D-рядов: multi-select в `DatasetView` + общий слой наложения для MultiView |
 | [p1-extract-common-domain-model-polargrid-field2d-timeseries.md](p1-extract-common-domain-model-polargrid-field2d-timeseries.md) | P1 | todo | `src/common/`: `PolarGrid`, `Field2D`, `FieldTimeSeries`, `units.py` |
 | [p2-extract-wave2dresults-from-render-and-utils.md](p2-extract-wave2dresults-from-render-and-utils.md) | P2 | todo | Вынести `Wave2DResults` из `w2d_render.py`/`utils.py` |
 | [p2-multiview-compare-runs.md](p2-multiview-compare-runs.md) | P2 | todo | MultiView: сравнение одноимённых датасетов по вкладкам-группам (кнопка «В сравнение») |
+| [p2-multiview-2d-grid-rendering.md](p2-multiview-2d-grid-rendering.md) | P2 | todo | MultiView: 2D-сравнение сеткой (общая нормировка) + поведение 2D при multi-select |
 | [p3-add-latest-flag-and-remove-hardcoded-wave2d-case.md](p3-add-latest-flag-and-remove-hardcoded-wave2d-case.md) | P3 | todo | Флаг `--latest`, убрать хардкод кейса |
 | [p4-add-catalog-json-and-run-sidecar-with-checksums.md](p4-add-catalog-json-and-run-sidecar-with-checksums.md) | P4 | todo | `run.json` sidecar + `catalog.py` + `sha256` + хранилище |
 | [p5-add-pytest-and-tests-for-paths-runid-and-fieldmap.md](p5-add-pytest-and-tests-for-paths-runid-and-fieldmap.md) | P5 | todo | `pytest` + `tests/` (пути, `run_id`, чистые части viewer) |
