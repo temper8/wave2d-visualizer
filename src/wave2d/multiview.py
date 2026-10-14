@@ -226,19 +226,14 @@ class MultiViewWindow(tk.Toplevel):
         super().__init__()
         self.comparison = comparison
         self.title("MultiView — сравнение графиков")
-        self.geometry("720x520")
+        self.geometry("720x650")
         self.minsize(420, 300)
         # Закрытие прячет окно (набор сохраняется), а не уничтожает его.
         self.protocol("WM_DELETE_WINDOW", self.hide)
 
         self._figures: list = []
         self._notebook = ttk.Notebook(self)
-        self._notebook.pack(fill=tk.BOTH, expand=True, padx=4, pady=(4, 0))
-        bottom = ttk.Frame(self)
-        bottom.pack(fill=tk.X, padx=4, pady=4)
-        ttk.Button(bottom, text="Очистить", command=self.comparison.clear).pack(
-            side=tk.RIGHT
-        )
+        self._notebook.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
 
         self._selected_name: str | None = None
         self._notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed)
@@ -378,11 +373,18 @@ class MultiViewWindow(tk.Toplevel):
             listbox.pack(side=tk.LEFT, fill=tk.X, expand=True)
             for item in items:
                 listbox.insert(tk.END, self._item_label(item))
+        actions = ttk.Frame(row)
+        actions.pack(side=tk.RIGHT, padx=(6, 0))
         ttk.Button(
-            row,
+            actions,
             text="Удалить выбранное",
             command=lambda: self._remove_selected(listbox, items),
-        ).pack(side=tk.RIGHT, padx=(6, 0))
+        ).pack(fill=tk.X)
+        ttk.Button(
+            actions,
+            text="Очистить все",
+            command=self.comparison.clear,
+        ).pack(fill=tk.X, pady=(4, 0))
 
     @staticmethod
     def _item_label(item: PlotItem) -> str:
