@@ -10,7 +10,8 @@
         dset = r.dataset("/fields/nphi+122/Ea")    # h5py.Dataset (лениво)
 
 Класс общий (не завязан на Wave2D/ELMFIRE): доменные обёртки вроде
-``Wave2DResults`` можно надстроить позже — см. ``TODO.md``.
+``Wave2DResults`` можно надстроить позже — см.
+``TODO/extract-wave2dresults-from-render-and-utils.md``.
 """
 
 from __future__ import annotations

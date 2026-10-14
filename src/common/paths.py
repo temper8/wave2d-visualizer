@@ -16,7 +16,7 @@
     └── derived/{plots,frames,video,coupling}/...
 
 Wave2D-навигацию выполняет :class:`~src.common.navigator.Navigator`.
-ELMFIRE и ``derived`` пока живут модульными функциями — см. ``TODO.md``.
+ELMFIRE и ``derived`` пока живут модульными функциями — см. ``TODO/``.
 """
 
 from __future__ import annotations

@@ -198,17 +198,17 @@ class Wave2DNavigator(Navigator):
 class ElmfireNavigator(Navigator):
     """Навигатор по каталогу ELMFIRE — заглушка.
 
-    Методы ещё не перенесены из :mod:`src.common.paths` (см. ``TODO.md``).
+    Методы ещё не перенесены из :mod:`src.common.paths` (см. ``TODO/``).
     """
 
     NAME = "elmfire"
     SUBDIR = "elmfire"
 
     def raw(self, run_id: str) -> Path:
-        raise NotImplementedError("ElmfireNavigator.raw: см. TODO.md")
+        raise NotImplementedError("ElmfireNavigator.raw: см. TODO/")
 
     def converted(self, run_id: str, name: str = "z1.h5") -> Path:
-        raise NotImplementedError("ElmfireNavigator.converted: см. TODO.md")
+        raise NotImplementedError("ElmfireNavigator.converted: см. TODO/")
 
 
 # --- derived (заглушка) ---------------------------------------------------
@@ -216,23 +216,23 @@ class ElmfireNavigator(Navigator):
 class DerivedNavigator(Navigator):
     """Навигатор по ``derived/`` — заглушка.
 
-    Методы ещё не перенесены из :mod:`src.common.paths` (см. ``TODO.md``).
+    Методы ещё не перенесены из :mod:`src.common.paths` (см. ``TODO/``).
     """
 
     NAME = "derived"
     SUBDIR = "derived"
 
     def plots(self, run_id: str | None = None) -> Path:
-        raise NotImplementedError("DerivedNavigator.plots: см. TODO.md")
+        raise NotImplementedError("DerivedNavigator.plots: см. TODO/")
 
     def frames(self, run_id: str) -> Path:
-        raise NotImplementedError("DerivedNavigator.frames: см. TODO.md")
+        raise NotImplementedError("DerivedNavigator.frames: см. TODO/")
 
     def video(self) -> Path:
-        raise NotImplementedError("DerivedNavigator.video: см. TODO.md")
+        raise NotImplementedError("DerivedNavigator.video: см. TODO/")
 
     def coupling(self, *parts: str) -> Path:
-        raise NotImplementedError("DerivedNavigator.coupling: см. TODO.md")
+        raise NotImplementedError("DerivedNavigator.coupling: см. TODO/")
 
 
 # --- фасад ----------------------------------------------------------------
