@@ -4,6 +4,10 @@
 в `done/`. Имена файлов — длинные и описательные (kebab-case, `.md`), чтобы по
 имени было понятно содержимое без открытия.
 
+Имя открытой задачи начинается с префикса приоритета — `p0-`…`p3-`, чтобы
+сортировка по имени давала порядок работ. Файлы в `done/` без префикса
+(это архив).
+
 ## Формат задачи
 
 Шапка каждого файла:
@@ -26,18 +30,18 @@
 
 | Файл | Приоритет | Статус | Кратко |
 |---|---|---|---|
-| [w2dviewer-split-into-tree-widget-and-dataset-view.md](w2dviewer-split-into-tree-widget-and-dataset-view.md) | P1 | todo | Разбить `W2DViewer` на оркестратор + `H5TreeView` + `DatasetView` |
-| [extract-common-domain-model-polargrid-field2d-timeseries.md](extract-common-domain-model-polargrid-field2d-timeseries.md) | P1 | todo | `src/common/`: `PolarGrid`, `Field2D`, `FieldTimeSeries`, `units.py` |
-| [extract-wave2dresults-from-render-and-utils.md](extract-wave2dresults-from-render-and-utils.md) | P1 | todo | Вынести `Wave2DResults` из `w2d_render.py`/`utils.py` |
-| [add-latest-flag-and-remove-hardcoded-wave2d-case.md](add-latest-flag-and-remove-hardcoded-wave2d-case.md) | P1 | todo | Флаг `--latest`, убрать хардкод кейса |
-| [add-catalog-json-and-run-sidecar-with-checksums.md](add-catalog-json-and-run-sidecar-with-checksums.md) | P1 | todo | `run.json` sidecar + `catalog.py` + `sha256` + хранилище |
-| [add-pytest-and-tests-for-paths-runid-and-fieldmap.md](add-pytest-and-tests-for-paths-runid-and-fieldmap.md) | P2 | todo | `pytest` + `tests/` (пути, `run_id`, чистые части viewer) |
-| [reorganize-src-into-apps-and-viz-packages.md](reorganize-src-into-apps-and-viz-packages.md) | P2 | todo | Разнести `src/` на `apps/` и `viz/` |
-| [hdf5-dimension-scales.md](hdf5-dimension-scales.md) | P2 | todo | Привязать dimension scales к осям `grid` |
-| [evaluate-splitting-repositories-after-layering.md](evaluate-splitting-repositories-after-layering.md) | P3 | todo | Оценить физическое разделение репозиториев |
-| [write-readme-with-physical-units-and-screenshots.md](write-readme-with-physical-units-and-screenshots.md) | P3 | todo | README: физ. величины и скриншоты |
-| [setup-ruff-linter-and-ci.md](setup-ruff-linter-and-ci.md) | P3 | todo | ruff + CI |
-| [elmfire-overlap-integral-and-fluctuations-shelved.md](elmfire-overlap-integral-and-fluctuations-shelved.md) | P0/P1 | отложено | ELMFIRE + интеграл перекрытия (слой `coupling`) |
+| [p1-w2dviewer-split-into-tree-widget-and-dataset-view.md](p1-w2dviewer-split-into-tree-widget-and-dataset-view.md) | P1 | todo | Разбить `W2DViewer` на оркестратор + `H5TreeView` + `DatasetView` |
+| [p1-extract-common-domain-model-polargrid-field2d-timeseries.md](p1-extract-common-domain-model-polargrid-field2d-timeseries.md) | P1 | todo | `src/common/`: `PolarGrid`, `Field2D`, `FieldTimeSeries`, `units.py` |
+| [p1-extract-wave2dresults-from-render-and-utils.md](p1-extract-wave2dresults-from-render-and-utils.md) | P1 | todo | Вынести `Wave2DResults` из `w2d_render.py`/`utils.py` |
+| [p1-add-latest-flag-and-remove-hardcoded-wave2d-case.md](p1-add-latest-flag-and-remove-hardcoded-wave2d-case.md) | P1 | todo | Флаг `--latest`, убрать хардкод кейса |
+| [p1-add-catalog-json-and-run-sidecar-with-checksums.md](p1-add-catalog-json-and-run-sidecar-with-checksums.md) | P1 | todo | `run.json` sidecar + `catalog.py` + `sha256` + хранилище |
+| [p2-add-pytest-and-tests-for-paths-runid-and-fieldmap.md](p2-add-pytest-and-tests-for-paths-runid-and-fieldmap.md) | P2 | todo | `pytest` + `tests/` (пути, `run_id`, чистые части viewer) |
+| [p2-reorganize-src-into-apps-and-viz-packages.md](p2-reorganize-src-into-apps-and-viz-packages.md) | P2 | todo | Разнести `src/` на `apps/` и `viz/` |
+| [p2-hdf5-dimension-scales.md](p2-hdf5-dimension-scales.md) | P2 | todo | Привязать dimension scales к осям `grid` |
+| [p3-evaluate-splitting-repositories-after-layering.md](p3-evaluate-splitting-repositories-after-layering.md) | P3 | todo | Оценить физическое разделение репозиториев |
+| [p3-write-readme-with-physical-units-and-screenshots.md](p3-write-readme-with-physical-units-and-screenshots.md) | P3 | todo | README: физ. величины и скриншоты |
+| [p3-setup-ruff-linter-and-ci.md](p3-setup-ruff-linter-and-ci.md) | P3 | todo | ruff + CI |
+| [p0-elmfire-overlap-integral-and-fluctuations-shelved.md](p0-elmfire-overlap-integral-and-fluctuations-shelved.md) | P0/P1 | отложено | ELMFIRE + интеграл перекрытия (слой `coupling`) |
 
 ## Выполненные задачи
 

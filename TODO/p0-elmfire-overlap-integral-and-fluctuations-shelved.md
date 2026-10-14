@@ -2,7 +2,7 @@
 
 - **Приоритет:** P0/P1
 - **Статус:** отложено
-- **Зависит от:** общий домен — [extract-common-domain-model-polargrid-field2d-timeseries.md](extract-common-domain-model-polargrid-field2d-timeseries.md)
+- **Зависит от:** общий домен — [p1-extract-common-domain-model-polargrid-field2d-timeseries.md](p1-extract-common-domain-model-polargrid-field2d-timeseries.md)
 - **Файлы:** `src/elmfire/`, `tools/integrator*.py`, будущий `src/coupling/`
 
 ## Контекст

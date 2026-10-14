@@ -2,7 +2,7 @@
 
 - **Приоритет:** P3
 - **Статус:** todo
-- **Зависит от:** [reorganize-src-into-apps-and-viz-packages.md](reorganize-src-into-apps-and-viz-packages.md)
+- **Зависит от:** [p2-reorganize-src-into-apps-and-viz-packages.md](p2-reorganize-src-into-apps-and-viz-packages.md)
 - **Файлы:** структура репозитория
 
 ## Контекст

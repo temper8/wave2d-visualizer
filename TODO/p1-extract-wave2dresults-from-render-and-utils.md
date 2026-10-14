@@ -2,7 +2,7 @@
 
 - **Приоритет:** P1
 - **Статус:** todo
-- **Зависит от:** [extract-common-domain-model-polargrid-field2d-timeseries.md](extract-common-domain-model-polargrid-field2d-timeseries.md)
+- **Зависит от:** [p1-extract-common-domain-model-polargrid-field2d-timeseries.md](p1-extract-common-domain-model-polargrid-field2d-timeseries.md)
 - **Файлы:** `w2d_render.py`, `src/utils.py`, `src/wave2d/`
 
 ## Контекст
@@ -19,4 +19,4 @@ Wave2D над общим доменом).
 - [ ] Перевести `w2d_render.py` и `src/utils.py` на неё.
 - [ ] Убрать хардкод кейса `wave2d_latest("FT-2_LH_smoke_nphi")` из
       `src/utils.py` — см.
-      [add-latest-flag-and-remove-hardcoded-wave2d-case.md](add-latest-flag-and-remove-hardcoded-wave2d-case.md).
+      [p1-add-latest-flag-and-remove-hardcoded-wave2d-case.md](p1-add-latest-flag-and-remove-hardcoded-wave2d-case.md).

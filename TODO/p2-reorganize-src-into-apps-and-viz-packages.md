@@ -2,7 +2,7 @@
 
 - **Приоритет:** P2
 - **Статус:** todo
-- **Зависит от:** [extract-common-domain-model-polargrid-field2d-timeseries.md](extract-common-domain-model-polargrid-field2d-timeseries.md)
+- **Зависит от:** [p1-extract-common-domain-model-polargrid-field2d-timeseries.md](p1-extract-common-domain-model-polargrid-field2d-timeseries.md)
 - **Файлы:** `src/` (структура), точки входа в корне
 
 ## Контекст
@@ -27,5 +27,5 @@ src/
       canvas/teardown для обоих viewer'ов).
 - [ ] Выделить `src/apps/` — тонкие точки входа; корневые скрипты остаются
       обёртками.
-- [ ] Согласовать с [elmfire-overlap-integral-and-fluctuations-shelved.md](elmfire-overlap-integral-and-fluctuations-shelved.md)
+- [ ] Согласовать с [p0-elmfire-overlap-integral-and-fluctuations-shelved.md](p0-elmfire-overlap-integral-and-fluctuations-shelved.md)
       (слой `coupling/`).
