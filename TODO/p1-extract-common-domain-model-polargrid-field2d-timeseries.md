@@ -24,6 +24,6 @@
       `FieldTimeSeries`.
 - [ ] `regular_polar_grid()` — построение регулярной сетки `(rho, θ)`.
 - [ ] `src/common/units.py` — явные константы единиц (см. блокеры физики в
-      [p0-elmfire-overlap-integral-and-fluctuations-shelved.md](p0-elmfire-overlap-integral-and-fluctuations-shelved.md)):
+      [p3-elmfire-overlap-integral-and-fluctuations-shelved.md](p3-elmfire-overlap-integral-and-fluctuations-shelved.md)):
       убрать неявные допущения о см/м.
 - [ ] Не ломать текущие скрипты; перевод адаптеров — отдельными шагами.

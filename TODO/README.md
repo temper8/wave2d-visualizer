@@ -41,7 +41,7 @@
 | [p3-evaluate-splitting-repositories-after-layering.md](p3-evaluate-splitting-repositories-after-layering.md) | P3 | todo | Оценить физическое разделение репозиториев |
 | [p3-write-readme-with-physical-units-and-screenshots.md](p3-write-readme-with-physical-units-and-screenshots.md) | P3 | todo | README: физ. величины и скриншоты |
 | [p3-setup-ruff-linter-and-ci.md](p3-setup-ruff-linter-and-ci.md) | P3 | todo | ruff + CI |
-| [p0-elmfire-overlap-integral-and-fluctuations-shelved.md](p0-elmfire-overlap-integral-and-fluctuations-shelved.md) | P0/P1 | отложено | ELMFIRE + интеграл перекрытия (слой `coupling`) |
+| [p3-elmfire-overlap-integral-and-fluctuations-shelved.md](p3-elmfire-overlap-integral-and-fluctuations-shelved.md) | P3 | отложено | ELMFIRE + интеграл перекрытия (слой `coupling`) |
 
 ## Выполненные задачи
 

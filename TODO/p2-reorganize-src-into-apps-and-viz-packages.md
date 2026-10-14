@@ -27,5 +27,5 @@ src/
       canvas/teardown для обоих viewer'ов).
 - [ ] Выделить `src/apps/` — тонкие точки входа; корневые скрипты остаются
       обёртками.
-- [ ] Согласовать с [p0-elmfire-overlap-integral-and-fluctuations-shelved.md](p0-elmfire-overlap-integral-and-fluctuations-shelved.md)
+- [ ] Согласовать с [p3-elmfire-overlap-integral-and-fluctuations-shelved.md](p3-elmfire-overlap-integral-and-fluctuations-shelved.md)
       (слой `coupling/`).
