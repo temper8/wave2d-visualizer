@@ -74,7 +74,10 @@ def _draw_line(
 
     ``x`` используется, только если его длина совпадает с ``len(y)``; иначе
     линия строится против индекса, а ``xlabel`` заменяется на ``"index"``.
+    Пропорции сбрасываются в ``auto``: предыдущий 2D-вид мог оставить
+    ``aspect="equal"``, а ``Axes.clear()`` его не сбрасывает.
     """
+    ax.set_aspect("auto")
     if x is not None and len(x) == len(y):
         ax.plot(x, y)
     else:

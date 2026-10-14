@@ -129,7 +129,9 @@ class DatasetView(ttk.Frame):
         self.comp_var = tk.StringVar(value="abs")
         self.axis_var = tk.StringVar(value="index")
 
-        self.fig, self.ax = plt.subplots(figsize=(6.5, 5.5))
+        self.fig, self.ax = plt.subplots(
+            figsize=(6.5, 5.5), layout="constrained"
+        )
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
         self.canvas_widget = self.canvas.get_tk_widget()
 
