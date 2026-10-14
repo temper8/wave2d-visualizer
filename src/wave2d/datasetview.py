@@ -4,9 +4,10 @@
 
 - **2D** — изображение датасета: ``(R,Z)`` (если есть координаты) или
   ``(rho,theta)``, с выбором составляющей ``real``/``imag``/``abs`` и colorbar;
-- **1D** — линия против оси ``index``/``rho``/``psi`` (``rho``/``psi`` —
-  если переданы и совпадают по длине) с подписями из атрибута ``units``;
-  комплексные данные — отдельным рендером-заглушкой (одна составляющая);
+- **1D** — одна или **несколько** линий против общей оси
+  ``index``/``rho``/``psi`` (``rho``/``psi`` — если переданы и совпадают по
+  длине у всех рядов) с подписями из атрибута ``units`` и легендой;
+  комплексные данные — по выбранной составляющей ``real``/``imag``/``abs``;
 - **attrs** — текст атрибутов узла (когда рисовать нечего: выбрана группа);
 - **message** — сообщение, если ничего не выбрано или размерность не
   поддерживается.
@@ -14,7 +15,8 @@
 Виджет владеет холстом matplotlib и ``NavigationToolbar``; набор
 переключателей собирается под выбранный датасет: 2D — ``(R,Z)/(rho,theta)``
 и ``real/imag/abs``, 1D — ``index/rho/psi`` (и ``real/imag/abs`` для
-комплексных данных). Окно-оркестратор лишь передаёт готовый :class:`Selection`.
+комплексных данных). Окно-оркестратор передаёт один узел или их список
+(multi-select) как :class:`Selection`.
 Сама отрисовка датасетов — в :mod:`src.wave2d.renderers` (без Tk).
 """
 
@@ -34,7 +36,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 import tkinter as tk
 from tkinter import ttk
 
-from src.wave2d.renderers import draw_1d, draw_1d_complex, draw_2d
+from src.wave2d.renderers import component, draw_2d, draw_curves
 
 
 def _units_text(units: Any) -> str:
@@ -82,7 +84,8 @@ class DatasetView(ttk.Frame):
         self.set_axes(rho, psi)
         self._colorbar = None
         self._attr_expanded: bool | None = None
-        self._selection: Selection | None = None
+        self._selection: Selection | list[Selection] | None = None
+        self._selections: list[Selection] = []
         self._build()
 
     # --- настройка -------------------------------------------------------
@@ -178,18 +181,31 @@ class DatasetView(ttk.Frame):
 
     # --- показ -----------------------------------------------------------
 
-    def show(self, selection: Selection | None) -> None:
-        """Показывает выбор (``None`` — узел не выбран).
+    def show(
+        self, selection: Selection | list[Selection] | None
+    ) -> None:
+        """Показывает выбор.
 
-        Сначала пересобирает переключатели под режим выбранного датасета,
-        затем перерисовывает область.
+        ``None`` — узел не выбран; одиночный :class:`Selection` — один узел;
+        список — несколько (multi-select в дереве). Сначала пересобирает
+        переключатели под режим выбора, затем перерисовывает область.
         """
         self._selection = selection
-        data = selection.data if selection is not None else None
-        path = selection.path if selection is not None else ""
-        mode, _ = self._mode(selection, data, path)
-        self._rebuild_controls(mode, data)
+        self._selections = self._as_list(selection)
+        mode, _ = self._mode()
+        self._rebuild_controls(mode)
         self.redraw()
+
+    @staticmethod
+    def _as_list(
+        selection: Selection | list[Selection] | None,
+    ) -> list[Selection]:
+        """Нормализует выбор к списку (одиночный узел — список из одного)."""
+        if selection is None:
+            return []
+        if isinstance(selection, Selection):
+            return [selection]
+        return list(selection)
 
     def redraw(self) -> None:
         """Перерисовывает область по текущему выбору и режиму."""
@@ -201,29 +217,25 @@ class DatasetView(ttk.Frame):
             self._colorbar = None
         self.ax.clear()
 
-        selection = self._selection
-        data = selection.data if selection is not None else None
-        path = selection.path if selection is not None else ""
-        attrs = selection.attrs if selection is not None else {}
-
-        mode, message = self._mode(selection, data, path)
+        mode, message = self._mode()
         self._layout(expanded=(mode == "attrs"))
 
         if mode == "attrs":
-            self._set_attr_text(self._attrs_text(attrs))
+            self._set_attr_text(self._attrs_text(self._selections[0].attrs))
         elif mode == "message":
             self.ax.text(
                 0.5, 0.5, message,
                 ha="center", va="center", transform=self.ax.transAxes,
             )
         elif mode == "1d":
-            self._draw_1d(data, path, attrs)
+            self._draw_1d()
         elif mode == "2d":
+            selection = self._selections[0]
             self._colorbar = draw_2d(
                 self.ax,
                 self.fig,
-                data,
-                title=path,
+                selection.data,
+                title=selection.path or "",
                 view=self.view_var.get(),
                 R=self.R,
                 Z=self.Z,
@@ -232,29 +244,40 @@ class DatasetView(ttk.Frame):
 
         self.canvas.draw_idle()
 
-    @staticmethod
-    def _mode(
-        selection: Selection | None,
-        data: np.ndarray | None,
-        path: str,
-    ) -> tuple[str, str]:
-        """Определяет режим и (для message) текст сообщения."""
-        if selection is None:
+    def _line_selections(self) -> list[Selection]:
+        """Выбранные 1D-датасеты (для наложения нескольких кривых)."""
+        return [
+            s for s in self._selections
+            if s.data is not None and s.data.ndim == 1
+        ]
+
+    def _mode(self) -> tuple[str, str]:
+        """Режим и (для message) текст сообщения по текущему выбору.
+
+        Все выбранные 1D-датасеты показываются вместе (наложение); при
+        2D/группе/смешанном выборе поведение — по первому узлу (multi-select
+        для 2D — отдельная задача ``p2-multiview-2d-grid-rendering``).
+        """
+        selections = self._selections
+        if not selections:
             return "message", "Выберите узел в дереве"
-        if data is None:
-            return "attrs", ""
-        if data.ndim == 1:
+        if all(s.data is not None and s.data.ndim == 1 for s in selections):
             return "1d", ""
-        if data.ndim == 2:
+        first = selections[0]
+        if first.data is None:
+            return "attrs", ""
+        if first.data.ndim == 1:
+            return "1d", ""
+        if first.data.ndim == 2:
             return "2d", ""
-        return "message", f"{path}\nshape={data.shape}"
+        return "message", f"{first.path}\nshape={first.data.shape}"
 
     # --- переключатели ----------------------------------------------------
 
-    def _rebuild_controls(self, mode: str, data: np.ndarray | None) -> None:
+    def _rebuild_controls(self, mode: str) -> None:
         """Собирает панель переключателей под текущий режим.
 
-        Создаются только применимые к датасету кнопки: 2D — вид и
+        Создаются только применимые к выбору кнопки: 2D — вид и
         составляющая, 1D — ось (и составляющая для комплексных данных),
         ``attrs``/``message`` — панель пуста.
         """
@@ -265,8 +288,9 @@ class DatasetView(ttk.Frame):
             self._add_view_buttons()
             self._add_comp_buttons()
         elif mode == "1d":
-            self._add_axis_buttons(data)
-            if np.iscomplexobj(data):
+            lines = self._line_selections()
+            self._add_axis_buttons(lines)
+            if any(np.iscomplexobj(s.data) for s in lines):
                 self._add_comp_buttons()
         if mode in ("1d", "2d"):
             self._add_compare_button()
@@ -298,11 +322,18 @@ class DatasetView(ttk.Frame):
                 command=self.redraw,
             ).pack(side=tk.LEFT)
 
-    def _add_axis_buttons(self, data: np.ndarray) -> None:
-        """Ось 1D: ``index`` всегда, ``rho``/``psi`` — если совпали по длине."""
+    def _add_axis_buttons(self, lines: list[Selection]) -> None:
+        """Ось 1D: ``index`` всегда, ``rho``/``psi`` — если совпали по длине.
+
+        При наложении нескольких рядов ось доступна, только если её длина
+        совпадает с каждым рядом (иначе ряды были бы на разных x).
+        """
+        lengths = {len(s.data) for s in lines}
         names = ["index"] + [
             name for name, (values, _units) in self._axes.items()
-            if values is not None and len(values) == len(data)
+            if values is not None
+            and lengths
+            and all(len(values) == length for length in lengths)
         ]
         if self.axis_var.get() not in names:
             self.axis_var.set("index")
@@ -326,40 +357,57 @@ class DatasetView(ttk.Frame):
         ).pack(side=tk.RIGHT)
 
     def _emit_add_to_comparison(self) -> None:
-        """Отдаёт текущий выбор колбэку (если он задан)."""
-        if self._selection is not None and self._on_add_to_comparison is not None:
-            self._on_add_to_comparison(self._selection)
+        """Отдаёт колбэку все показанные датасеты (multi-select — каждый)."""
+        if self._on_add_to_comparison is None:
+            return
+        for selection in self._selections:
+            if selection.data is not None:
+                self._on_add_to_comparison(selection)
 
     # --- 1D ---------------------------------------------------------------
 
-    def _draw_1d(self, data: np.ndarray, path: str, attrs: dict) -> None:
-        """Рисует 1D: вещественный — линией, комплексный — заглушкой."""
-        x, xlabel = self._active_axis(data)
-        ylabel = self._ylabel(path, attrs)
-        if np.iscomplexobj(data):
-            draw_1d_complex(
-                self.ax, data, title=path, x=x, xlabel=xlabel,
-                ylabel=ylabel, comp=self.comp_var.get(),
+    def _draw_1d(self) -> None:
+        """Рисует 1D: один ряд или наложение нескольких с легендой."""
+        lines = self._line_selections()
+        if not lines:
+            return
+        x, xlabel = self._active_axis(lines)
+        comp = self.comp_var.get()
+        series = [
+            (
+                x,
+                component(selection.data, comp),
+                self._ylabel(selection.path or "", selection.attrs),
+                None,
             )
-        else:
-            draw_1d(
-                self.ax, data, title=path, x=x, xlabel=xlabel, ylabel=ylabel
-            )
+            for selection in lines
+        ]
+        single = len(lines) == 1
+        first = lines[0]
+        draw_curves(
+            self.ax,
+            series,
+            title=(first.path or "") if single else "",
+            xlabel=xlabel,
+            ylabel=self._ylabel(first.path or "", first.attrs) if single else "",
+        )
 
     def _active_axis(
-        self, data: np.ndarray
+        self, lines: list[Selection]
     ) -> tuple[np.ndarray | None, str]:
         """Выбранная ось ``(массив, подпись)`` или ``(None, "index")``.
 
-        Ось берётся только если она есть и её длина совпадает с ``len(data)``;
-        иначе рендер построит линию против индекса.
+        Ось берётся, только если она есть и её длина совпадает с **каждым**
+        рядом; иначе рендер построит линии против индекса.
         """
         name = self.axis_var.get()
         entry = self._axes.get(name)
         if entry is None:
             return None, "index"
         values, units = entry
-        if values is None or len(values) != len(data):
+        if values is None or not lines:
+            return None, "index"
+        if any(len(values) != len(s.data) for s in lines):
             return None, "index"
         text = _units_text(units)
         return values, (f"{name}, {text}" if text else name)

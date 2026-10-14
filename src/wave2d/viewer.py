@@ -129,13 +129,22 @@ class W2DViewer:
 
     # --- обработчики -----------------------------------------------------
 
-    def on_select(self, path: str) -> None:
-        """Собирает :class:`Selection` по пути узла и отдаёт его области данных."""
+    def on_select(self, paths: list[str]) -> None:
+        """Собирает :class:`Selection` по путям узлов и отдаёт их области данных.
+
+        Список может быть пустым (снят выделение) или содержать несколько
+        узлов (multi-select в дереве).
+        """
+        self.dataset_view.show([self._make_selection(path) for path in paths])
+
+    def _make_selection(self, path: str) -> Selection:
+        """Собирает :class:`Selection` по одному пути узла."""
         kind = self.reader.kind(path)
-        attrs = self._attrs(path)
-        data = None if kind == "group" else self._array(path)
-        self.dataset_view.show(
-            Selection(path=path, kind=kind, attrs=attrs, data=data)
+        return Selection(
+            path=path,
+            kind=kind,
+            attrs=self._attrs(path),
+            data=None if kind == "group" else self._array(path),
         )
 
     def _attrs(self, path: str) -> dict:

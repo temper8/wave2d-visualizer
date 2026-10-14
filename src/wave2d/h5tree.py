@@ -2,7 +2,8 @@
 
 Отделяет построение дерева от окна-оркестратора: виджет ничего не знает о
 рендеринге и о том, как используется выбранный узел. Содержимое строится
-через :meth:`H5Reader.walk`, о выборе сообщается колбэком ``on_select(path)``.
+через :meth:`H5Reader.walk`, о выборе сообщается колбэком
+``on_select(paths)`` (список выбранных узлов).
 
 Импорт ``h5py`` не нужен: тип узла приходит из ``walk`` (``"group"``/
 ``"dataset"``), а форма и dtype берутся у самого объекта.
@@ -28,14 +29,14 @@ class H5TreeView(ttk.Frame):
     def __init__(
         self,
         master,
-        on_select: Callable[[str], None] | None = None,
+        on_select: Callable[[list[str]], None] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(master, **kwargs)
         self._on_select = on_select
         self._reader: H5Reader | None = None
 
-        self.tree = ttk.Treeview(self, show="tree", selectmode="browse")
+        self.tree = ttk.Treeview(self, show="tree", selectmode="extended")
         scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.grid(row=0, column=0, sticky="nsew")
@@ -58,12 +59,10 @@ class H5TreeView(ttk.Frame):
                 label = f"{name}   {tuple(obj.shape)} {obj.dtype}"
                 self.tree.insert(parent, "end", iid=full, text=label)
 
-    def selection(self) -> str | None:
-        """Путь выбранного узла или ``None``, если ничего не выбрано."""
-        selected = self.tree.selection()
-        return selected[0] if selected else None
+    def selection(self) -> list[str]:
+        """Пути выбранных узлов (пустой список, если ничего не выбрано)."""
+        return list(self.tree.selection())
 
     def _handle_select(self, event=None) -> None:
-        path = self.selection()
-        if path is not None and self._on_select is not None:
-            self._on_select(path)
+        if self._on_select is not None:
+            self._on_select(self.selection())

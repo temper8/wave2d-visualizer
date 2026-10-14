@@ -12,6 +12,8 @@ Tk — работает с готовыми ``Axes``/``Figure``, а colorbar в�
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.colorbar import Colorbar
@@ -67,33 +69,52 @@ def draw_2d(
     return fig.colorbar(mesh, cax=cax)
 
 
-def _draw_line(
-    ax: Axes,
-    y: np.ndarray,
-    *,
-    title: str,
-    x: np.ndarray | None,
-    xlabel: str,
-    ylabel: str,
-) -> None:
-    """Общая отрисовка 1D-линии: ось ``x`` (или индекс) и подписи.
+Curve = tuple[np.ndarray | None, np.ndarray, str, str | None]
+"""1D-ряд для :func:`draw_curves`: ``(x, y, label, color)``.
 
-    ``x`` используется, только если его длина совпадает с ``len(y)``; иначе
-    линия строится против индекса, а ``xlabel`` заменяется на ``"index"``.
+``x`` — ось (``None`` или несовпадающая длина → индекс), ``label`` —
+подпись в легенде, ``color`` — цвет (``None`` — цвет из цикла matplotlib).
+"""
+
+
+def draw_curves(
+    ax: Axes,
+    series: Sequence[Curve],
+    *,
+    title: str = "",
+    xlabel: str = "index",
+    ylabel: str = "",
+) -> None:
+    """Рисует несколько 1D-рядов на одной оси с общей легендой.
+
+    Общий слой наложения: используется :class:`DatasetView` (несколько
+    выбранных 1D-датасетов) и MultiView (одноимённые ряды из разных
+    прогонов). Ось ``x`` применяется, только если она задана и совпадает по
+    длине **у всех** рядов; иначе ряды строятся против индекса, а ``xlabel``
+    заменяется на ``"index"``. Легенда показывается при двух рядах и более.
     Пропорции сбрасываются в ``auto``: предыдущий 2D-вид мог оставить
     ``aspect="equal"``, а ``Axes.clear()`` его не сбрасывает.
     """
     ax.set_aspect("auto")
-    if x is not None and len(x) == len(y):
-        ax.plot(x, y)
-    else:
-        ax.plot(y)
+    use_x = bool(series) and all(
+        x is not None and len(x) == len(y) for x, y, _label, _color in series
+    )
+    for x, y, label, color in series:
+        kwargs = {"color": color} if color is not None else {}
+        if use_x:
+            ax.plot(x, y, label=label, **kwargs)
+        else:
+            ax.plot(y, label=label, **kwargs)
+    if not use_x:
         xlabel = "index"
-    ax.set_title(title, fontsize=8)
+    if title:
+        ax.set_title(title, fontsize=8)
     if xlabel:
         ax.set_xlabel(xlabel)
     if ylabel:
         ax.set_ylabel(ylabel)
+    if len(series) > 1:
+        ax.legend(fontsize=7)
 
 
 def draw_1d(
@@ -112,7 +133,7 @@ def draw_1d(
     ``ylabel`` (имя датасета + ``units``) — готовые подписи от вызывающего.
     """
     y = np.real(data) if np.iscomplexobj(data) else data
-    _draw_line(ax, y, title=title, x=x, xlabel=xlabel, ylabel=ylabel)
+    draw_curves(ax, [(x, y, "", None)], title=title, xlabel=xlabel, ylabel=ylabel)
 
 
 def draw_1d_complex(
@@ -125,18 +146,15 @@ def draw_1d_complex(
     ylabel: str = "",
     comp: str = "abs",
 ) -> None:
-    """Рисует комплексный 1D-датасет — **заглушка**: одна составляющая.
+    """Рисует комплексный 1D-датасет одной составляющей.
 
-    Пока выводится только ``component(data, comp)`` (по умолчанию ``abs``).
-    Полноценный режим (``real``/``imag``/``abs`` линиями + легенда) —
-    отдельный шаг задачи
-    ``TODO/p3-extend-1d-dataset-view-with-axes-and-multiple-curves.md``.
+    Выводится ``component(data, comp)`` (по умолчанию ``abs``). Наложение
+    ``real``/``imag``/``abs`` несколькими линиями — через :func:`draw_curves`.
     """
-    _draw_line(
+    draw_curves(
         ax,
-        component(data, comp),
+        [(x, component(data, comp), "", None)],
         title=title,
-        x=x,
         xlabel=xlabel,
         ylabel=ylabel,
     )
