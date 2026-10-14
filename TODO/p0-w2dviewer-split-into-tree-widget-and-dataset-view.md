@@ -37,7 +37,7 @@
 - [x] **B.** `src/wave2d/h5tree.py` — `H5TreeView(ttk.Frame)`: дерево + скроллбар
       + `populate(reader)` (через `H5Reader.walk`), колбэк `on_select(path)`;
       корень файла не показывается (как сейчас).
-- [ ] **C.** `src/wave2d/datasetview.py` — `DatasetView(ttk.Frame)` +
+- [x] **C.** `src/wave2d/datasetview.py` — `DatasetView(ttk.Frame)` +
       `Selection(path, kind, attrs, data)`. Режимы: **2D** (`(R,Z)`/`(rho,θ)` ×
       `real/imag/abs`, colorbar), **1D** (одна линия), **attrs** (текст атрибутов
       узла), **message** (нет выбора / неподдерживаемая размерность).
