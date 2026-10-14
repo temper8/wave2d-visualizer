@@ -11,7 +11,7 @@
 
 Класс общий (не завязан на Wave2D/ELMFIRE): доменные обёртки вроде
 ``Wave2DResults`` можно надстроить позже — см.
-``TODO/extract-wave2dresults-from-render-and-utils.md``.
+``TODO/p2-extract-wave2dresults-from-render-and-utils.md``.
 """
 
 from __future__ import annotations
@@ -86,6 +86,21 @@ class H5Reader:
         """Имена дочерних объектов группы."""
         return list(self.file[path].keys())
 
+    def kind(self, name: str) -> str:
+        """Тип объекта: ``"group"`` или ``"dataset"``.
+
+        Позволяет вызывающему коду (дерево в GUI) различать узлы, не
+        импортируя ``h5py``.
+        """
+        if name not in self.file:
+            raise KeyError(f"Объект '{name}' не найден в {self.path}")
+        obj = self.file[name]
+        return "group" if isinstance(obj, h5py.Group) else "dataset"
+
+    def is_group(self, name: str) -> bool:
+        """Является ли объект группой (иначе — датасет)."""
+        return self.kind(name) == "group"
+
     def walk(self, path: str = "/") -> list[tuple[str, str, object]]:
         """Обход поддерева: список ``(полный_путь, kind, объект)``.
 
@@ -100,8 +115,7 @@ class H5Reader:
 
         def visitor(name: str, obj) -> None:
             full = f"{prefix}/{name}".replace("//", "/")
-            kind = "group" if isinstance(obj, h5py.Group) else "dataset"
-            result.append((full, kind, obj))
+            result.append((full, self.kind(full), obj))
 
         start = self.file[path]
         if isinstance(start, h5py.Group):

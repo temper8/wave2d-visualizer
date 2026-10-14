@@ -31,7 +31,7 @@
 
 ## Шаги
 
-- [ ] **A.** `H5Reader.kind(path)` / `is_group(path)` в `src/common/h5reader.py`;
+- [x] **A.** `H5Reader.kind(path)` / `is_group(path)` в `src/common/h5reader.py`;
       переиспользовать `kind()` внутри `walk()`, чтобы viewer/дерево не
       импортировали `h5py`.
 - [ ] **B.** `src/wave2d/h5tree.py` — `H5TreeView(ttk.Frame)`: дерево + скроллбар
