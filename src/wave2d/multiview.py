@@ -14,9 +14,11 @@
 
 from __future__ import annotations
 
+import tkinter as tk
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
+from tkinter import ttk
 from typing import Any
 
 import numpy as np
@@ -194,3 +196,165 @@ def default_comparison() -> ComparisonSet:
     if _default_comparison is None:
         _default_comparison = ComparisonSet()
     return _default_comparison
+
+
+# --- окно (GUI) ----------------------------------------------------------
+
+
+class MultiViewWindow(tk.Toplevel):
+    """Окно сравнения: вкладка на группу, внутри — список графиков.
+
+    Реального рендера пока нет: вкладка показывает текстовый список
+    добавленных элементов (метка источника + путь узла + форма). Окно
+    подписывается на :class:`ComparisonSet` и перестраивается при изменениях.
+    """
+
+    def __init__(self, comparison: ComparisonSet) -> None:
+        super().__init__()
+        self.comparison = comparison
+        self.title("MultiView — сравнение графиков")
+        self.geometry("560x420")
+        self.minsize(360, 240)
+        # Закрытие прячет окно (набор сохраняется), а не уничтожает его.
+        self.protocol("WM_DELETE_WINDOW", self.hide)
+
+        self._notebook = ttk.Notebook(self)
+        self._notebook.pack(fill=tk.BOTH, expand=True, padx=4, pady=(4, 0))
+        bottom = ttk.Frame(self)
+        bottom.pack(fill=tk.X, padx=4, pady=4)
+        ttk.Button(bottom, text="Очистить", command=self.comparison.clear).pack(
+            side=tk.RIGHT
+        )
+
+        self._selected_name: str | None = None
+        self._notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed)
+        comparison.subscribe(self.refresh)
+        self.refresh()
+
+    # --- показ/скрытие ---------------------------------------------------
+
+    def show(self) -> None:
+        """Показывает окно (после закрытия — снова)."""
+        self.deiconify()
+        self.lift()
+
+    def hide(self) -> None:
+        """Прячет окно; набор сравнения при этом сохраняется."""
+        self.withdraw()
+
+    # --- вкладки ---------------------------------------------------------
+
+    def refresh(self) -> None:
+        """Перестраивает вкладки под текущее состояние набора."""
+        for tab_id in self._notebook.tabs():
+            self._notebook.forget(tab_id)
+        for child in list(self._notebook.winfo_children()):
+            child.destroy()
+
+        groups = self.comparison.groups()
+        if not groups:
+            frame = ttk.Frame(self._notebook)
+            ttk.Label(
+                frame,
+                justify="center",
+                text=(
+                    "Нет добавленных графиков.\n\n"
+                    "Нажмите «В сравнение» в окне просмотра."
+                ),
+            ).pack(expand=True)
+            self._notebook.add(frame, text="(пусто)")
+            return
+
+        for name in groups:
+            count = len(self.comparison.items(name))
+            self._notebook.add(self._build_tab(name), text=f"{name} ({count})")
+
+        target = self._selected_name if self._selected_name in groups else groups[0]
+        self.select_group(target)
+
+    def select_group(self, name: str) -> None:
+        """Выбирает вкладку группы ``name`` (если она есть)."""
+        groups = self.comparison.groups()
+        if name not in groups:
+            return
+        tabs = self._notebook.tabs()
+        index = groups.index(name)
+        if index < len(tabs):
+            self._notebook.select(tabs[index])
+            self._selected_name = name
+
+    def _build_tab(self, name: str) -> ttk.Frame:
+        """Вкладка группы: заголовок, список элементов и кнопка удаления."""
+        frame = ttk.Frame(self._notebook)
+        items = self.comparison.items(name)
+        ttk.Label(
+            frame, text=f"Датасет: {name}   (элементов: {len(items)})"
+        ).pack(anchor="w", padx=6, pady=(6, 2))
+
+        body = ttk.Frame(frame)
+        body.pack(fill=tk.BOTH, expand=True, padx=6)
+        listbox = tk.Listbox(body, activestyle="none")
+        scrollbar = ttk.Scrollbar(body, orient="vertical", command=listbox.yview)
+        listbox.configure(yscrollcommand=scrollbar.set)
+        listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        for item in items:
+            shape = tuple(item.data.shape) if item.data is not None else ()
+            listbox.insert(tk.END, f"{item.source}   {item.node_path}   {shape}")
+
+        ttk.Button(
+            frame,
+            text="Удалить выбранное",
+            command=lambda: self._remove_selected(listbox, items),
+        ).pack(anchor="e", padx=6, pady=6)
+        return frame
+
+    def _remove_selected(
+        self, listbox: tk.Listbox, items: list[PlotItem]
+    ) -> None:
+        """Удаляет выбранный в списке элемент из набора."""
+        selection = listbox.curselection()
+        if not selection:
+            return
+        index = selection[0]
+        if index < len(items):
+            self.comparison.remove(items[index])
+
+    def _on_tab_changed(self, event=None) -> None:
+        """Запоминает выбранную вкладку, чтобы сохранить её при перестройке."""
+        try:
+            index = self._notebook.index(self._notebook.select())
+        except tk.TclError:
+            return
+        groups = self.comparison.groups()
+        if 0 <= index < len(groups):
+            self._selected_name = groups[index]
+
+
+_window: MultiViewWindow | None = None
+
+
+def open_multiview(comparison: ComparisonSet | None = None) -> MultiViewWindow:
+    """Открывает (или показывает уже открытое) окно MultiView.
+
+    Окно создаётся дочерним для корня Tk по умолчанию, поэтому не закрывается
+    вместе с окном просмотра, из которого был добавлен график.
+    """
+    global _window
+    comparison = comparison or default_comparison()
+    if _window is None or not _window.winfo_exists():
+        _window = MultiViewWindow(comparison)
+    _window.show()
+    return _window
+
+
+def add_to_comparison(
+    item: PlotItem, comparison: ComparisonSet | None = None
+) -> AddResult:
+    """Добавляет элемент в набор, открывает окно и выбирает вкладку группы."""
+    comparison = comparison or default_comparison()
+    result = comparison.add(item)
+    window = open_multiview(comparison)
+    if result is not AddResult.CONFLICT:
+        window.select_group(item.name)
+    return result

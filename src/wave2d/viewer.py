@@ -10,16 +10,19 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 from src.common.h5reader import H5Reader
+from src.common.navigator import default_navigator
 from src.wave2d.datasetview import DatasetView, Selection
 from src.wave2d.h5tree import H5TreeView
+from src.wave2d.multiview import AddResult, PlotItem, add_to_comparison
 from src.wave2d.schema import (
     GRID_PSI,
     GRID_RHO,
@@ -28,6 +31,26 @@ from src.wave2d.schema import (
     format_version_of,
     open_results,
 )
+
+
+def _source_label(file_path: str) -> str:
+    """Метка источника для MultiView: ``<case>/<stamp> [tasks/<task>]``.
+
+    Best-effort: путь приводится к корню навигатора Wave2D; если не вышло —
+    берётся имя родительской папки.
+    """
+    path = Path(file_path)
+    try:
+        root = default_navigator().wave2d.root
+        parts = path.resolve().relative_to(root.resolve()).parts[:-1]
+    except (ValueError, OSError):
+        return path.parent.name or path.stem
+    if not parts:
+        return path.stem
+    label = "/".join(parts[:2]) if len(parts) >= 2 else parts[0]
+    if len(parts) >= 4 and parts[2] == "tasks":
+        label += f" [tasks/{parts[3]}]"
+    return label
 
 
 class W2DViewer:
@@ -70,6 +93,7 @@ class W2DViewer:
             coords=self._load_coords(),
             rho=self._load_axis(GRID_RHO),
             psi=self._load_axis(GRID_PSI),
+            on_add_to_comparison=self._add_to_comparison,
         )
 
         paned.add(self.tree_view, weight=1)
@@ -127,6 +151,27 @@ class W2DViewer:
             return self.reader.array(path)
         except Exception:
             return None
+
+    def _add_to_comparison(self, selection: Selection) -> None:
+        """Отправляет текущий датасет в общий набор MultiView."""
+        if selection.data is None:
+            return
+        item = PlotItem(
+            source=_source_label(self.file_path),
+            file_path=self.file_path,
+            node_path=selection.path or "",
+            data=selection.data,
+            attrs=dict(selection.attrs or {}),
+            view=self.dataset_view.view_var.get(),
+            comp=self.dataset_view.comp_var.get(),
+        )
+        if add_to_comparison(item) is AddResult.CONFLICT:
+            messagebox.showwarning(
+                "Сравнение",
+                "В этой группе уже есть датасеты другой размерности "
+                "(1D и 2D вместе не сравниваются).",
+                parent=self.root,
+            )
 
     def on_closing(self) -> None:
         """Освобождает ресурсы и закрывает окно."""

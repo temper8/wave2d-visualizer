@@ -20,6 +20,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -69,10 +70,12 @@ class DatasetView(ttk.Frame):
         coords: tuple[np.ndarray, np.ndarray] | None = None,
         rho: tuple[np.ndarray, Any] | None = None,
         psi: tuple[np.ndarray, Any] | None = None,
+        on_add_to_comparison: Callable[[Selection], None] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(master, **kwargs)
         self.R: np.ndarray | None = None
+        self._on_add_to_comparison = on_add_to_comparison
         self.Z: np.ndarray | None = None
         self.set_coords(coords)
         self._axes: dict[str, tuple[np.ndarray, Any]] = {}
@@ -265,6 +268,8 @@ class DatasetView(ttk.Frame):
             self._add_axis_buttons(data)
             if np.iscomplexobj(data):
                 self._add_comp_buttons()
+        if mode in ("1d", "2d"):
+            self._add_compare_button()
 
     def _add_view_buttons(self) -> None:
         """2D-вид ``(R,Z)/(rho,theta)``; ``(R,Z)`` — только если есть координаты."""
@@ -309,6 +314,21 @@ class DatasetView(ttk.Frame):
                 frame, text=name, variable=self.axis_var, value=name,
                 command=self.redraw,
             ).pack(side=tk.LEFT)
+
+    def _add_compare_button(self) -> None:
+        """Кнопка «В сравнение» — справа в строке переключателей."""
+        if self._on_add_to_comparison is None:
+            return
+        ttk.Button(
+            self.controls,
+            text="В сравнение",
+            command=self._emit_add_to_comparison,
+        ).pack(side=tk.RIGHT)
+
+    def _emit_add_to_comparison(self) -> None:
+        """Отдаёт текущий выбор колбэку (если он задан)."""
+        if self._selection is not None and self._on_add_to_comparison is not None:
+            self._on_add_to_comparison(self._selection)
 
     # --- 1D ---------------------------------------------------------------
 
