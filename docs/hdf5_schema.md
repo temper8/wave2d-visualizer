@@ -2,9 +2,9 @@
 
 Документ описывает структуру HDF5-файла, который создаётся после расчёта и
 лежит в каталоге задачи
-(`Results/<конфигурация>/<дата-время>/tasks/<задача>/results.h5`). Для серии по
-`nphi` лаунчер дополнительно собирает общий файл в корне прогона — см.
-«Общий файл для серии по `nphi`».
+(`Results/<конфигурация>/<дата-время>/tasks/<задача>/results.h5`). Лаунчер
+дополнительно собирает run-level файл в корне прогона — см.
+«Общий (run-level) файл `results.h5`».
 
 Основано на модуле `Source/WaveToP/hdf5_writer.f90` (запись) и
 `Source/WaveToP/hdf5_manager.f90` (низкоуровневые операции).
@@ -15,10 +15,10 @@
 
 | Атрибут | Тип | Значение | Смысл |
 |---|---|---|---|
-| `format_version` | string | `0.94` | версия схемы HDF5-файла |
+| `format_version` | string | `0.95` | версия схемы HDF5-файла |
 
 Атрибут пишется один раз при создании файла (`open('NEW')`) в
-`write_manifest_to_hdf5` и сохраняется при дозаписи (`poloidal_field_2d`) и при
+`write_report_to_hdf5` и сохраняется при дозаписи (`poloidal_field_2d`) и при
 сборке общего файла серии. Версия инкрементируется при несовместимых
 изменениях структуры. Чтение: `f.attrs['format_version']` (h5py).
 
@@ -26,18 +26,26 @@
 
 1. `wave2D` (опция 16, `FieldSolver`, вызывается лаунчером первым):
    - создаёт `results.h5` заново (`open('NEW')` — файл усекается);
-   - пишет `/manifest/system`, `/manifest/toolchain` и `/manifest/run`
-     (`created_local_time`, `task_id`);
+   - пишет `/report/<task_name>/system`, `/report/toolchain` и
+     `/report/<task_name>/run` (`created_local_time`, `task_id`), где
+     `task_name` — имя каталога задачи;
    - пишет `/input/*`;
-   - после `FieldSolver` дописывает `/manifest/run/elapsed_s`.
-2. `poloidal_field_2d` (запускается лаунчером после основного счёта):
+   - после `FieldSolver` дописывает `/report/<task_name>/run/elapsed_s`.
+2. `power_balance` (`bin/power_balance.exe`, шаг `PowerBalance`):
+   - открывает файл на дозапись (`open('OLD')`);
+   - пишет группу `/power_balance/nphi*` — 1D радиальный энергобаланс моды.
+3. `poloidal_field_2d` (запускается лаунчером после основного счёта):
    - открывает файл на дозапись (`open('OLD')`);
    - дописывает `/grid`, один блок `/fields/nphi*`, `/flux_surf`,
      `/plasma/params`, `/plasma/bfield`, `/plasma/dielectric`,
      `/plasma/resonance`, `/plasma/wkb`, `/geometry`.
-3. Лаунчер (`launcher/results.py`, `write_git_provenance`) после завершения
-   задачи дописывает через `h5py` в `/manifest/toolchain` поля `git_commit`,
-   `git_branch`, `git_dirty`.
+4. Лаунчер (`launcher/results.py`) после завершения задачи дописывает через
+   `h5py`:
+   - `write_git_provenance` — в `/report/toolchain` поля `git_commit`,
+     `git_branch`, `git_dirty`;
+   - `write_report` — в `/report/<task_name>` данные из `report.toml`
+     (`[metadata]` и `[execution_result]` — атрибуты группы, `[steps.*]` —
+     подгруппы `duration/` и `status/`; разности времен считает лаунчер).
 
 Важно: `poloidal_field_2d` обрабатывает **одну** выбранную моду `nphi`, поэтому
 в файле **задачи** ровно одна группа `/fields/nphi*` (сокращённо `nphi`). Только
@@ -58,7 +66,7 @@
 - **Dimension scales**: пока **не привязаны** (нет атрибутов `CLASS`,
   `DIMENSION_LIST`). Оси заданы неявно порядком выше; координаты —
   `grid/rho`, `grid/psi`, а полоидальный угол будет добавлен (`grid/theta_deg`)
-  вместе с scales. План — см. `TODO/p2-hdf5-dimension-scales.md`.
+  вместе с scales. План — см. `TODO/p7-hdf5-dimension-scales.md`.
 - **Единицы**: атрибуты и датасеты записываются в тех единицах, в которых
   величины хранятся в модулях кода. Часть длин нормирована (внутренние
   единицы), плотность/температура/частота — физические; конкретные единицы
@@ -73,12 +81,20 @@
 ## Структура
 
 ```
-results.h5                  # корневой атрибут: format_version = "0.94"
-├── manifest/               # провенанс: окружение, инструменты, запуск
-│   ├── system/             # атрибуты: system, hostname, cpu_model
+results.h5                  # корневой атрибут: format_version = "0.95"
+├── report/                 # провенанс: окружение, инструменты, запуск
+│   │                       #   + атрибуты прогона (только nphi:
+│   │                       #     sum_tasks_time_sec, wall_time_sec)
 │   ├── toolchain/          # compiler_ver, compiler_opt, hdf5_ver
 │   │                       #   + git_commit, git_branch, git_dirty (пишет лаунчер)
-│   └── run/                # created_local_time, task_id, elapsed_s
+│   └── <task_name>/        # по одной группе на задачу (имя = каталог задачи)
+│       ├── system/         # окружение и железо узла: system, hostname, cpu_model,
+│       │                   #   omp/openblas/mkl_num_threads, omp_max_threads
+│       ├── run/            # created_local_time, task_id, elapsed_s
+│       ├── duration/       # времена шагов, с: FieldSolver, PowerBalance, ...
+│       ├── status/         # статусы шагов: SUCCESS/FAILED/SKIPPED (+ *_exit_code)
+│       └── (attrs)         # node, start_time, slurm_job_id, status,
+│                           #   exit_code, total_time_sec
 ├── input/                  # атрибуты входных параметров (имена = секции .toml)
 │   ├── w2grid/             # [w2grid]
 │   ├── plasma/             # [plasma]
@@ -98,6 +114,17 @@ results.h5                  # корневой атрибут: format_version = 
 │   ├── resonance/          # w0_wpe, w0_wlh, w0_wuh, w0_wce, Xcutoff_at_0, PolRes_at_0
 │   └── wkb/                # Nrho1, Nrho2 (комплексные)
 ├── flux_surf/              # theta_deg, theta_pi_diff
+├── power_balance/          # радиальный энергобаланс по модам nphi (как /fields)
+│   └── nphi+122/           # группа моды (одна в файле задачи;
+│       │                   #   много — в общем файле серии)
+│       ├── attribute: nphi
+│       ├── attrs: Pabs_kW, Pinp_kW, discrepancy
+│       ├── psi             # (Nr), 1
+│       ├── Sflux, dSflux_dpsi  # (Nr), kW
+│       ├── dPld_dpsi, dPttmp_dpsi, dPmix_dpsi, dPtot_dpsi   # (Nr), kW
+│       ├── dV              # (Nr), cm^3
+│       ├── dP_tube         # (Nr), kW
+│       └── p_ld, p_tt, p_mx    # (Nr), kW/cm^3
 └── fields/                 # поля по модам nphi
     └── nphi+122/           # группа моды (одна в файле задачи;
         │                   #   много — в общем файле серии)
@@ -108,15 +135,29 @@ results.h5                  # корневой атрибут: format_version = 
 
 ## Атрибуты
 
-### `/manifest/system`
+### `/report/<task_name>/system`
+
+Окружение и железо узла, на котором считалась **эта** задача. Группа живёт под
+задачей, а не в корне `/report`, потому что в серии задачи могут попасть на
+разные узлы кластера (у каждого свой `hostname`/`cpu_model`).
 
 | Атрибут | Тип | Смысл |
 |---|---|---|
 | `system` | string | ОС (например, `Linux`/`Windows`) |
 | `hostname` | string | имя узла |
 | `cpu_model` | string | модель CPU |
+| `omp_num_threads` | string | значение `OMP_NUM_THREADS` (`unset`, если не задано) |
+| `openblas_num_threads` | string | значение `OPENBLAS_NUM_THREADS` (`unset`, если не задано) |
+| `mkl_num_threads` | string | значение `MKL_NUM_THREADS` (`unset`, если не задано) |
+| `omp_max_threads` | int | эффективное число потоков OpenMP (`omp_get_max_threads()`); `0` — бинарник собран без OpenMP |
 
-### `/manifest/toolchain`
+`*_num_threads` — это то, что *запросили* (env/планировщик), а `omp_max_threads` —
+то, что OpenMP возьмёт по факту. На сборке без OpenMP `omp_max_threads = 0`,
+хотя env-переменные всё равно сохраняются. Расхождение с числом потоков в
+`Qinteg` (директива `NUM_THREADS(16)` в `forward_pass.f90`) — отдельный вопрос,
+см. `TODO/qinteg-performance.md`.
+
+### `/report/toolchain`
 
 | Атрибут | Тип | Смысл |
 |---|---|---|
@@ -127,13 +168,55 @@ results.h5                  # корневой атрибут: format_version = 
 | `git_branch` | string | имя ветки (пишет лаунчер) |
 | `git_dirty` | string | `clean`/`dirty` — были ли незакоммиченные изменения (пишет лаунчер) |
 
-### `/manifest/run`
+### `/report/<task_name>/run`
 
 | Атрибут | Тип | Смысл |
 |---|---|---|
 | `created_local_time` | string | локальное время создания файла, ISO-8601 без зоны (`2026-09-28T12:31:18`) |
 | `task_id` | string | имя каталога задачи (`nphi-122`, `single`; в общем файле серии — задача-база) |
 | `elapsed_s` | double | стенное время фазы `FieldSolver`, с (`-1`, если часы недоступны) |
+
+### `/report/<task_name>`
+
+Данные из `report.toml` (пишет `scripts/task_runner.sh`, разности времен —
+`write_report` лаунчера). Поля `[metadata]` и `[execution_result]` хранятся
+атрибутами самой группы, шаги `[steps.*]` — подгруппами `duration/` и `status/`
+(см. ниже).
+
+| Атрибут | Тип | Смысл |
+|---|---|---|
+| `task_name` | string | имя задачи (из `[metadata]`, совпадает с `task_id` и именем каталога) |
+| `node` | string | узел, где выполнялся пайплайн |
+| `start_time` | string | время старта пайплайна, ISO-8601 с зоной |
+| `slurm_job_id` | string | id SLURM-задачи или `local` |
+| `status` | string | итоговый статус (`SUCCESS`/`FAILED_*`) |
+| `exit_code` | int | код возврата пайплайна |
+| `total_time_sec` | double | полное время пайплайна, с |
+
+Дубли (сохраняются намеренно): `task_name` ↔ `run/task_id`,
+`start_time` ↔ `run/created_local_time`, `total_time_sec`/`duration/FieldSolver`
+↔ `run/elapsed_s`.
+
+### `/report/<task_name>/duration`
+
+Стенное время каждого шага пайплайна, с (`end - start`, считает лаунчер):
+
+| Атрибут | Смысл |
+|---|---|
+| `FieldSolver` | шаг `bin/wave2D.exe -w <task>` |
+| `PowerBalance` | шаг `bin/power_balance.exe -w <task>` |
+| `poloidal_field_2d` | шаг `bin/poloidal_field_2d.exe -w <task>` |
+
+Длительность пишется только для выполненных шагов; у `SKIPPED` её нет.
+
+### `/report/<task_name>/status`
+
+Статус каждого шага (пишет лаунчер из `[steps.*]`):
+
+| Атрибут | Смысл |
+|---|---|
+| `<step>` | `SUCCESS` / `FAILED` / `SKIPPED` |
+| `<step>_exit_code` | код возврата шага (int; у `SKIPPED` отсутствует) |
 
 ### `/input/w2grid` (целые)
 
@@ -239,6 +322,28 @@ results.h5                  # корневой атрибут: format_version = 
 | `theta_deg` | `(Nr, Msmax)` | полоидальный угол θ, град |
 | `theta_pi_diff` | `(Nr, Msmax)` | `π − |θ − π|`, град |
 
+### `/power_balance/nphi*` (например, `nphi+122`, `nphi-061`, `nphi+000`)
+
+Радиальный энергобаланс для одной моды `nphi` — замена прежних `.dat`
+(`flux(psi).dat`, `pabs(psi).dat`, `power_balance.dat`). В файле задачи такая
+группа одна; в общем файле серии — по одной на моду, как в `/fields`.
+Датасеты длины `Nr`; ось `ir = 0` (r = 0) занулена.
+
+- атрибут `nphi` — целое тороидальное число (одна мода, как в `/fields`);
+- атрибут `Pabs_kW` — полная поглощённая мощность, кВт;
+- атрибут `Pinp_kW` — входная (пойнтинговская) мощность, кВт;
+- атрибут `discrepancy` — `|Pabs − Pinp| / mean(Pabs, Pinp)`, безразмерно.
+
+| Датасет | Единицы | Смысл |
+|---|---|---|
+| `psi` | 1 | `rho/a0` (дублирует `/grid/psi`) |
+| `Sflux` | kW | поток энергии через поверхность потока |
+| `dSflux_dpsi` | kW | производная потока по `psi` |
+| `dPld_dpsi`, `dPttmp_dpsi`, `dPmix_dpsi`, `dPtot_dpsi` | kW | вклады (LD, TTMP, mixed) и их сумма |
+| `dV` | cm³ | объём трубки потока |
+| `dP_tube` | kW | мощность, поглощённая в трубке |
+| `p_ld`, `p_tt`, `p_mx` | kW/cm³ | удельные плотности вкладов |
+
 ### `/plasma/params`
 
 | Датасет | Смысл |
@@ -280,24 +385,79 @@ results.h5                  # корневой атрибут: format_version = 
 
 `Nrho1`, `Nrho2` — два корня радиального показателя преломления (WKB).
 
-## Общий файл для серии по `nphi`
+## Общий (run-level) файл `results.h5`
 
-Для конфигурации с `[series] var = 'nphi'` каждая задача пишет свой
-`results.h5` в `tasks/<задача>/`, а лаунчер (`launcher/results.py`,
-`merge_nphi_results`) собирает общий файл
-`Results/<конфигурация>/<дата-время>/results.h5`:
+Каждый прогон (одна задача или серия) собирает общий файл
+`Results/<конфигурация>/<дата-время>/results.h5` функцией
+`launcher/results.py:merge_results`. Во всех случаях берётся
+`report/toolchain` и из каждой задачи копируется её группа
+`report/<task_name>` (с `system/`, `run/`, `duration/`, `status/` и
+атрибутами); в `/report` пишутся атрибуты прогона (`write_work_times`, см.
+ниже). Кроме того, в `/report` всегда добавляются run-level группы
+`/report/build` и `/report/system_info` (см. ниже). Дальше поведение зависит
+от серии:
 
-- базой копируется `results.h5` первой задачи — общие группы (`manifest`,
-  `input`, `grid`, `geometry`, `plasma`, `flux_surf`) и её собственная
-  группа `/fields/nphi*`;
-- из каждой следующей задачи добавляется только её группа
-  `/fields/nphi*`;
-- в `/input/w2grid` записывается диапазон всей серии:
-  `nphi1 = start`, `nphi2 = start + (number − 1)·step`, `nphistep = step`
-  (в файле отдельной задачи там `nphi1 == nphi2 == значение моды`).
+- **`nphi`** — базой копируется `results.h5` первой задачи (общие группы
+  `input`, `grid`, `geometry`, `plasma`, `flux_surf` и её собственные
+  `report/<task_name>`, `/fields/nphi*` и `/power_balance/nphi*`), затем из
+  следующих задач добавляются их `/fields/nphi*`, `/power_balance/nphi*` и
+  `report/<task_name>`; в `/input/w2grid`
+  записывается диапазон всей серии: `nphi1 = start`,
+  `nphi2 = start + (number − 1)·step`, `nphistep = step` (в файле отдельной
+  задачи `nphi1 == nphi2 == значение моды`). Только этот случай объединяет
+  данные — при серии по `nphi` общие группы у задач идентичны;
+- **любая другая серия или одиночная задача** — общий файл содержит
+  **только** `/report` (report-only): данные не объединяются, потому что
+  меняющийся параметр (`Nr`, `Mmax`, `freq`, …) меняет формы/значения
+  датасетов. Базовая задача как источник данных сознательно не подставляется,
+  чтобы файл нельзя было принять за результат всей серии. Объединение
+  не-`nphi` данных — будущая работа (`TODO/merge-non-nphi.md`).
 
-Таким образом, общий файл отличается от файла задачи только числом групп
-`/fields/nphi*` и диапазоном в `input/w2grid`; остальные группы идентичны.
+В корень `/report` общего файла дополнительно пишутся атрибуты прогона
+(`write_work_times`):
+
+| Атрибут | Тип | Смысл |
+|---|---|---|
+| `sum_tasks_time_sec` | double | сумма `total_time_sec` по всем задачам |
+| `wall_time_sec` | double | стенное время всего прогона по таймеру Python |
+
+В корень `/report` общего файла дополнительно пишется группа `/report/build` —
+паспорт сборки, скопированный из `bin/build-info.json` (`_write_build_info`):
+
+| Атрибут | Тип | Смысл |
+|---|---|---|
+| `timestamp` | string | UTC-время сборки |
+| `compiler` | string | компилятор (`FC`) |
+| `compiler_version` | string | полная версия компилятора |
+| `optflags` | string | флаги оптимизации сборки |
+| `blas` | string | BLAS-библиотека и её версия |
+| `hdf5` | string | версия HDF5 |
+| `hdf5_libs` | string | линковочные библиотеки HDF5 |
+| `git_commit`, `git_branch`, `git_dirty` | string/bool | git на момент сборки |
+| `wave2D_sha256`, `poloidal_field_2d_sha256` | string | sha256 бинарников |
+
+Группа появляется только если `bin/build-info.json` существует (сборка
+Windows его не создаёт — там шаг пропускается). Она
+служит для сопоставления прогона с конкретной сборкой: `*_sha256` однозначно
+привязывают результаты к бинарникам. `/report/toolchain` при этом остаётся тем,
+что отдал сам Fortran (компилятор/HDF5/флаги), и не перезаписывается.
+
+В корень `/report` общего файла также пишется группа `/report/system_info` —
+машина и Python, запустившие лаунчер (из `launcher/system_info.py`; тот же
+набор, что в `system_info.ini`, `_write_system_info`):
+
+| Атрибут | Тип | Смысл |
+|---|---|---|
+| `system` | string | ОС (`Linux`/`Windows`/…) |
+| `host` | string | имя узла, где запущен лаунчер |
+| `release` | string | версия ядра/ОС |
+| `machine` | string | архитектура (`x86_64`, …) |
+| `processor` | string | процессор (часто пусто на Linux) |
+| `python` | string | версия Python лаунчера |
+
+Это узел-оркестратор, а не узел счёта: per-task `report/<task_name>/system`
+описывает машину, считавшую конкретную задачу. Группа пишется всегда, когда
+известен `system_info`.
 
 ## Особенности
 
@@ -315,7 +475,34 @@ results.h5                  # корневой атрибут: format_version = 
 
 ## История схемы и миграция
 
-### 0.94 (текущая)
+### Unreleased
+
+- добавлена группа `/power_balance/nphi*` — 1D радиальный энергобаланс,
+  который пишет отдельный бинарник `bin/power_balance.exe` (шаг
+  `PowerBalance`); лаунчер объединяет её по модам так же, как `/fields/nphi*`;
+  аддитивное изменение, `format_version` не меняется.
+
+### 0.95 (текущая)
+
+- группа `/manifest` переименована в `/report`: общий `/report/toolchain` и
+  per-task `/report/<task_name>`;
+- `system` живёт под задачей: `/report/<task_name>/system` (узлы кластера
+  разные, поэтому глобальной группы `/report/system` больше нет);
+- `run` переехал под задачу: `/report/<task_name>/run`;
+- данные `report.toml` пишутся в `/report/<task_name>`: `[metadata]` и
+  `[execution_result]` — атрибуты группы, `[steps.*]` — подгруппы
+  `/report/<task_name>/duration` и `/report/<task_name>/status`, а
+  `total_time_sec` считается из `[timestamps.total]` (пишет лаунчер,
+  `write_report`).
+- в `/report/<task_name>/system` добавлены потоки: `omp_num_threads`,
+  `openblas_num_threads`, `mkl_num_threads` (env-значения, `unset` если не
+  заданы) и `omp_max_threads` (`omp_get_max_threads()`, `0` без OpenMP);
+  для этого `system_info.f90` препроцессируется (`-cpp` у gfortran, `-fpp` уже
+  был у Intel) под `#ifdef _OPENMP`.
+- в общем файле добавлена run-level группа `/report/system_info` — машина и
+  Python лаунчера (из `launcher/system_info.py`, как в `system_info.ini`).
+
+### 0.94
 
 - `/grid/rho` теперь имеет длину `Nr`, хранится в см (`rho*scale`) и точно
   совпадает с радиальной осью всех 2D-датасетов `(Nr, Msmax)`;
