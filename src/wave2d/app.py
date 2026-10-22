@@ -3,7 +3,9 @@
 Дерево строится динамически по файловой системе через
 :class:`~src.common.navigator.Wave2DNavigator` (кейсы → прогоны → задачи),
 в листьях — реальные HDF5-файлы (``results.h5``, ``report.h5``). Выбор листа
-показывает сводку ``report``/``input``; кнопка (или двойной клик) открывает
+показывает сводку ``report``/``input``; выбор **папки прогона** — краткую
+сводку по прогону (артефакты, задачи, статусы, сборка) и включает панель
+кнопок действий с прогоном. Кнопка (или двойной клик) открывает
 :class:`~src.wave2d.viewer.W2DViewer` в отдельном окне ``Toplevel``.
 
 Кнопка **«Открыть»** в шапке позволяет выбрать другую папку Wave2D; выбранный
@@ -42,6 +44,9 @@ from src.wave2d.viewer import W2DViewer
 # Иконка окна — единый PNG рядом с модулем (генератор: tools/make_icon.py).
 _ICON_PATH = Path(__file__).resolve().parent / "assets" / "w2d_app_icon.png"
 
+# Кнопки-заглушки панели действий с прогоном (команды появятся позже).
+RUN_ACTIONS = ("Рендер полей", "Спектр", "Открыть папку")
+
 
 class W2DNavigatorApp:
     """Окно выбора прогона Wave2D и запуска просмотрщика."""
@@ -53,6 +58,7 @@ class W2DNavigatorApp:
         self._set_window_icon()
 
         self._paths: dict[str, Path] = {}  # iid узла -> путь к HDF5-файлу
+        self._runs: dict[str, str] = {}  # iid узла-прогона -> run_id
         self.selected: Path | None = None
 
         # Проверяем доступность папки до построения навигатора: обращение
@@ -233,11 +239,21 @@ class W2DNavigatorApp:
         right.rowconfigure(0, weight=1)
         right.columnconfigure(0, weight=1)
 
+        self.actions = ttk.LabelFrame(right, text="Действия с прогоном")
+        self.actions.grid(
+            row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(6, 0)
+        )
+        self.run_buttons: list[ttk.Button] = []
+        for text in RUN_ACTIONS:
+            btn = ttk.Button(self.actions, text=text, state="disabled")
+            btn.pack(side=tk.LEFT, padx=(6, 4), pady=6)
+            self.run_buttons.append(btn)
+
         self.open_btn = ttk.Button(
             right, text="Открыть viewer", command=self.open_selected,
             state="disabled",
         )
-        self.open_btn.grid(row=1, column=0, columnspan=2, sticky="ew", pady=6, padx=6)
+        self.open_btn.grid(row=2, column=0, columnspan=2, sticky="ew", pady=6, padx=6)
 
         paned.add(left, weight=2)
         paned.add(right, weight=3)
@@ -332,6 +348,7 @@ class W2DNavigatorApp:
                     node = self.tree.insert(
                         case_node, "end", text=run_id.split("/", 1)[1], open=False
                     )
+                self._runs[node] = run_id
                 self._add_run_artifacts(node, run_id)
                 for task in self.nav.tasks(run_id):
                     task_path = self.nav.task_results(run_id, task)
@@ -356,21 +373,28 @@ class W2DNavigatorApp:
         """Очищает дерево и инфо-панель, сбрасывая выбор."""
         self.tree.delete(*self.tree.get_children())
         self._paths.clear()
+        self._runs.clear()
         self.selected = None
         self.open_btn.configure(state="disabled")
+        self._set_run_buttons(False)
         self._set_info(info)
 
     # --- обработчики -----------------------------------------------------
 
     def on_select(self, event=None) -> None:
         selection = self.tree.selection()
-        path = self._paths.get(selection[0]) if selection else None
+        iid = selection[0] if selection else None
+        path = self._paths.get(iid) if iid else None
+        run_id = self._runs.get(iid) if iid else None
         self.selected = path
         self.open_btn.configure(state="normal" if path else "disabled")
+        self._set_run_buttons(run_id is not None)
         if path is not None:
             self._show_file_info(path)
+        elif run_id is not None:
+            self._show_run_info(run_id)
         else:
-            # Выбрана папка (кейс/прогон) или ничего — правая панель пуста.
+            # Выбрана папка кейса или ничего — правая панель пуста.
             self._set_info("")
 
     def on_double(self, event=None) -> None:
@@ -397,6 +421,133 @@ class W2DNavigatorApp:
         W2DViewer(tk.Toplevel(self.root), str(path))
 
     # --- инфо-панель -----------------------------------------------------
+
+    def _set_run_buttons(self, enabled: bool) -> None:
+        """Включает/гасит кнопки панели действий (активны для прогона)."""
+        state = "normal" if enabled else "disabled"
+        for btn in self.run_buttons:
+            btn.configure(state=state)
+
+    def _show_run_info(self, run_id: str) -> None:
+        """Краткая сводка по прогону: артефакты, задачи, статусы, сборка.
+
+        Данные берутся из run-level артефакта (``report.h5`` >= 0.96 или
+        ``results.h5`` <= 0.95: ``/report`` либо ``/manifest``) и из ФС
+        (задачи, содержимое папки). Любые ошибки чтения не ломают панель.
+        """
+        run_dir = self.nav.run_dir(run_id)
+        artifacts = self.nav.run_artifacts(run_id)
+        tasks = self.nav.tasks(run_id)
+
+        lines = [f"Прогон : {run_id}", f"Путь   : {run_dir}"]
+
+        report: dict[str, dict] = {}
+        version = None
+        if artifacts:
+            try:
+                with H5Reader(artifacts[0]) as reader:
+                    version = reader.attrs("/").get("format_version")
+                    prov = next(
+                        (p for p in (REPORT, MANIFEST) if reader.contains(p)),
+                        None,
+                    )
+                    if prov is not None:
+                        report = reader.attrs_recursive(prov)
+            except Exception as e:  # noqa: BLE001
+                lines.append(f"(не удалось прочитать {artifacts[0].name}: {e})")
+
+        if version is not None:
+            lines.append(f"Формат : {self._text(version)}")
+
+        if artifacts:
+            parts: list[str] = []
+            for p in artifacts:
+                try:
+                    parts.append(f"{p.name} ({p.stat().st_size / 1e6:.2f} MB)")
+                except OSError:
+                    parts.append(p.name)
+            lines.append("Файл   : " + ", ".join(parts))
+        else:
+            lines.append("Файл   : нет run-level файла")
+
+        lines.append(f"Задачи : {self._task_summary(tasks)}")
+
+        # Статусы задач: ключи ``/report/<task>`` со своим атрибутом status.
+        task_set = set(tasks)
+        statuses = [
+            attrs["status"]
+            for key, attrs in report.items()
+            if key in task_set and "status" in attrs
+        ]
+        if statuses:
+            ok = sum(1 for s in statuses if self._text(s) == "SUCCESS")
+            lines.append(f"Статус : {ok}/{len(statuses)} SUCCESS")
+
+        wall = report.get(REPORT, {}).get("wall_time_sec")
+        if wall is not None:
+            lines.append(f"Время  : wall {float(wall):.2f} s")
+
+        # Сборка: 0.96 — /report/build, 0.94 — /manifest/toolchain.
+        build = report.get("build") or report.get("toolchain") or {}
+        if build:
+            commit = self._text(build.get("git_commit", ""))[:7]
+            if self._text(build.get("git_dirty", "")) in ("True", "dirty"):
+                commit += "*"
+            branch = self._text(build.get("git_branch", "?"))
+            compiler = self._text(
+                build.get("compiler") or build.get("compiler_ver") or "?"
+            )
+            hdf5 = build.get("hdf5") or build.get("hdf5_ver")
+            suffix = f", hdf5 {self._text(hdf5)}" if hdf5 is not None else ""
+            lines.append(f"Сборка : {branch}@{commit} ({compiler}{suffix})")
+
+        system = report.get("system_info") or report.get("system") or {}
+        if system:
+            host = self._text(system.get("host") or system.get("hostname") or "?")
+            sysname = self._text(system.get("system", "?"))
+            lines.append(f"Система: {host} — {sysname}")
+
+        try:
+            names = ", ".join(sorted(p.name for p in run_dir.iterdir()))
+            lines.append(f"Содержит: {names}")
+        except OSError:
+            pass
+
+        self._set_info("\n".join(lines))
+
+    def _task_summary(self, tasks: list[str]) -> str:
+        """Краткое описание задач: ``5 (nphi -122…+122)`` или просто число."""
+        if not tasks:
+            return "нет"
+        rng = self._axis_range(tasks)
+        return f"{len(tasks)} ({rng})" if rng else str(len(tasks))
+
+    @staticmethod
+    def _axis_range(tasks: list[str]) -> str | None:
+        """Диапазон ``<ось>±NNN`` по именам задач; ``None`` — имена не такие."""
+        axis = ""
+        values: list[int] = []
+        for name in tasks:
+            pos = name.find("+")
+            idx = pos if pos > 0 else name.find("-")
+            if idx <= 0:
+                return None
+            try:
+                values.append(int(name[idx:]))
+            except ValueError:
+                return None
+            if not axis:
+                axis = name[:idx]
+            elif axis != name[:idx]:
+                return None
+        return f"{axis} {min(values)}…{max(values)}" if values else None
+
+    @staticmethod
+    def _text(value: object) -> str:
+        """Приводит значение атрибута HDF5 к строке (``bytes`` → utf-8)."""
+        if isinstance(value, bytes):
+            return value.decode("utf-8", "replace")
+        return str(value)
 
     def _show_file_info(self, path: Path) -> None:
         if not fsprobe.is_file(path):
