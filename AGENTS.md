@@ -47,8 +47,8 @@ Python-комплекс для конвертации, 2D-визуализаци
 
 ```bash
 uv run elmfire_convert.py     # ELMFIRE *.dat -> z1.h5
-uv run w2d_render.py          # 2D-графики полей из results.h5
-uv run w2d_viewer.py          # GUI: дерево results.h5 + изображение поля
+uv run w2d_render.py          # 2D-графики полей из results.h5 (или первой задачи)
+uv run w2d_viewer.py          # GUI: дерево HDF5 (results.h5/report.h5) + поле
 uv run w2d_app.py             # GUI: выбор прогона Wave2D -> открыть w2d_viewer
 uv run elmfire_viewer.py      # GUI просмотра флуктуаций
 uv run tools/integrator.py    # интеграл перекрытия
@@ -104,9 +104,13 @@ data/
 ├── wave2d/
 │   ├── FT-2_LH_smoke_nphi/          # кейс (`case_id`): серия по nphi
 │   │   └── <stamp>/                 # напр. 2026-09-29_13-56-49
-│   │       ├── results.h5           # общий файл серии по nphi (5 мод)
+│   │       ├── results.h5           # run-level данные, схема <= 0.95 (5 мод)
 │   │       ├── input.toml, done_tasks.txt, system_info.ini, ...
 │   │       └── tasks/<задача>/results.h5   # по файлу на моду: nphi+000 … nphi-122
+│   ├── FT-2_LH_nphi_lite/           # кейс: схема 0.96, report.h5 вместо results.h5
+│   │   └── <stamp>/
+│   │       ├── report.h5            # run-level отчёт (report-only, без данных)
+│   │       └── tasks/<задача>/results.h5   # данные + /spectrum + /power_balance
 │   ├── FT-2_LH_smoke/               # кейс: одиночный прогон, только tasks/Nr+051/
 │   └── FT2/                         # legacy 0.9 — не читается (нужен >= 0.94)
 ├── elmfire/
@@ -120,9 +124,12 @@ data/
     └── coupling/             # результаты интеграла перекрытия
 ```
 
-- Все пути — только через `src/common/paths.py` (`wave2d_results`, `elmfire_raw`,
+- Все пути — только через `src/common/paths.py` (`wave2d_results`,
+  `wave2d_primary_results`, `wave2d_viewable`, `elmfire_raw`,
   `elmfire_converted`, `frames_dir`, `video_dir`, `plots_dir`, `derived`, ...).
-  Не хардкодить `results.h5` / `z1.h5` / `Elmfire_WagD`.
+  Не хардкодить `results.h5` / `report.h5` / `z1.h5` / `Elmfire_WagD`.
+  `wave2d_primary_results` — файл с данными (run-level `results.h5` → первая
+  задача); `wave2d_viewable` — то же, но с фолбэком на report-only `report.h5`.
 - Скрипты принимают `run_id` первым аргументом
   (`uv run w2d_render.py FT-2_LH_smoke_nphi/2026-09-29_13-56-49`,
   `uv run elmfire_convert.py WagD`). `w2d_render.py` по умолчанию берёт свежий
@@ -134,7 +141,8 @@ data/
   (`FT-2_LH_smoke_nphi/<stamp>/`). Legacy-плоско (`Globus/results.h5`) поддержано.
   Список кейсов не хардкодится — дискавери и
   пути даёт `navigator.DataNavigator` (фасад): `nav.wave2d.cases()/runs()/
-  latest()/results()/task_results()`. База — `Navigator` (корень + `path()`),
+  latest()/results()/run_report()/run_artifacts()/task_results()`. База —
+  `Navigator` (корень + `path()`),
   `Wave2DNavigator` — реализован, `ElmfireNavigator`/`DerivedNavigator` — заглушки
   (см. `TODO/`). Всё реэкспортируется из `paths.py`, обёртки `wave2d_*` сохранены.
 - ELMFIRE: `WagD`.
@@ -145,7 +153,8 @@ data/
 
 Формат HDF5-файлов вынесен в отдельные спецификации — не дублировать его здесь:
 
-- **Wave2D** (`results.h5`) — [`docs/hdf5_schema.md`](docs/hdf5_schema.md)
+- **Wave2D** (per-task `results.h5`; run-level `results.h5` в <= 0.95 или
+  report-only `report.h5` в 0.96) — [`docs/hdf5_schema.md`](docs/hdf5_schema.md)
   (канон, продюсерская спека) и [`docs/results_h5.md`](docs/results_h5.md)
   (читательская: наблюдения, инварианты, подводные камни).
 - **ELMFIRE** (`z1.h5`) — [`docs/elmfire_h5.md`](docs/elmfire_h5.md)
@@ -172,10 +181,11 @@ data/
    Первые `Nr` — физическая сетка, остальное — margin; в 0.94 (`Nrmargin` удалён)
    `grid/rho` уже длины `Nr`. Не используй `coord/rho` целиком.
 4. **`tools/integrator.py` хардкодит кадр 42.** Постановка интеграла ещё не зафиксирована.
-5. **Данные вложены: `<case_id>/<stamp>/`.** Единого `<case_id>/results.h5` нет:
-   прогон лежит в `<case_id>/<stamp>/` (`results.h5` — общий файл серии по `nphi`,
-   `tasks/<задача>/results.h5` — по моде). Учитывается `Navigator`
-   (`run_id = "<case_id>/<stamp>"`).
+5. **Данные вложены: `<case_id>/<stamp>/`.** Научные данные всегда в
+   `tasks/<задача>/results.h5`. Run-level файл: в схеме <= 0.95 — общий
+   `results.h5` (серия по `nphi`); в 0.96 — report-only `report.h5` (данных нет).
+   Учитывается `Navigator` (`run_id = "<case_id>/<stamp>"`,
+   `run_artifacts()/run_report()/primary_results()`).
 6. **Сентинелы на оси `ir = 0` — `0.0`, а не `NaN`.** Незаполненные точки равны
    нулю; в `plasma/params` вне первой точки — мусор. Подробности —
    [`docs/results_h5.md`](docs/results_h5.md).

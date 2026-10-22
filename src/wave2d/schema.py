@@ -1,12 +1,16 @@
 """Схема Wave2D ``results.h5`` (ридер).
 
 Поддерживается **только** новый формат — :data:`MIN_FORMAT` и выше (текущий
-канон ``0.94``). Файлы старых схем (``0.9``…``0.93``) не читаются: у них другая
+канон ``0.96``). Файлы старых схем (``0.9``…``0.93``) не читаются: у них другая
 раскладка групп и другой набор атрибутов. При попытке открыть такой файл
 :func:`ensure_supported` бросает :class:`UnsupportedFormatError` с сообщением,
 что формат не поддерживается.
 
-Корневой атрибут версии — ``format_version`` (строка вида ``"0.94"``).
+Корневой атрибут версии — ``format_version`` (строка вида ``"0.96"``).
+
+Схема 0.96: научные данные лежат в ``tasks/<task>/results.h5``; run-level
+артефакт — report-only ``report.h5`` (группа :data:`REPORT`). Схема модуля
+описана в ``docs/hdf5_schema.md``.
 
 Здесь же собраны пути групп/датасетов, чтобы не размазывать литералы по коду,
 и хелперы для имён групп ``nphi``.
@@ -111,10 +115,17 @@ def open_results(path: str | Path) -> H5Reader:
 
 # --- пути групп (формат >= 0.94) -----------------------------------------
 
+# Провенанс. /manifest — legacy (0.94); с 0.95 группа называется /report.
 MANIFEST = "/manifest"
 MANIFEST_SYSTEM = f"{MANIFEST}/system"
 MANIFEST_TOOLCHAIN = f"{MANIFEST}/toolchain"
 MANIFEST_RUN = f"{MANIFEST}/run"
+
+# Run-level отчёт (>= 0.95). Пишется в report.h5; в файле задачи может не быть.
+REPORT = "/report"
+REPORT_TOOLCHAIN = f"{REPORT}/toolchain"
+REPORT_SYSTEM_INFO = f"{REPORT}/system_info"
+REPORT_BUILD = f"{REPORT}/build"
 
 INPUT = "/input"
 INPUT_W2GRID = f"{INPUT}/w2grid"
@@ -140,6 +151,12 @@ PLASMA_RESONANCE = f"{PLASMA}/resonance"
 PLASMA_WKB = f"{PLASMA}/wkb"
 
 FIELDS = "/fields"
+
+# 1D-энергобаланс по модам nphi (>= 0.96); группы ``nphi*`` как в /fields.
+POWER_BALANCE = "/power_balance"
+
+# Run-level тороидальный спектр антенны An(n) (>= 0.96): n, An, abs2.
+SPECTRUM = "/spectrum"
 
 
 # --- поля по модам nphi --------------------------------------------------

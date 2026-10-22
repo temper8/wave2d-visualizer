@@ -8,7 +8,8 @@
 Раскладка::
 
     data/
-    ├── wave2d/<case_id>/<stamp>/results.h5            # общий файл серии
+    ├── wave2d/<case_id>/<stamp>/results.h5            # run-level данные (<= 0.95)
+    ├── wave2d/<case_id>/<stamp>/report.h5             # run-level отчёт (>= 0.96)
     ├── wave2d/<case_id>/<stamp>/tasks/<task>/results.h5
     ├── wave2d/<case_id>/results.h5                    # legacy-плоско
     ├── elmfire/<run_id>/raw/*.dat
@@ -36,10 +37,14 @@ from src.common.navigator import (  # noqa: F401
     wave2d_cases,
     wave2d_dir,
     wave2d_latest,
+    wave2d_primary_results,
     wave2d_results,
+    wave2d_run_artifacts,
+    wave2d_run_report,
     wave2d_runs,
     wave2d_task_results,
     wave2d_tasks,
+    wave2d_viewable,
 )
 
 __all__ = [
@@ -54,10 +59,14 @@ __all__ = [
     "wave2d_cases",
     "wave2d_dir",
     "wave2d_latest",
+    "wave2d_primary_results",
     "wave2d_results",
+    "wave2d_run_artifacts",
+    "wave2d_run_report",
     "wave2d_runs",
     "wave2d_task_results",
     "wave2d_tasks",
+    "wave2d_viewable",
     "ELMFIRE_RUNS",
     "elmfire_dir",
     "elmfire_raw",

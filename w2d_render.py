@@ -5,9 +5,7 @@ import numpy as np
 from src.common.paths import (
     plots_dir,
     wave2d_latest,
-    wave2d_results,
-    wave2d_task_results,
-    wave2d_tasks,
+    wave2d_primary_results,
 )
 from src.utils import view2d, print_dict
 from src.wave2d.schema import (
@@ -28,20 +26,10 @@ from src.wave2d.schema import (
 DEFAULT_CASE = "FT-2_LH_smoke_nphi"
 
 
-def resolve_results(run_id: str):
-    """Файл прогона; если общего нет — файл первой задачи."""
-    path = wave2d_results(run_id)
-    if path.is_file():
-        return path
-    tasks = wave2d_tasks(run_id)
-    if tasks:
-        return wave2d_task_results(run_id, tasks[0])
-    return path
-
-
 def main():
     run_id = sys.argv[1] if len(sys.argv) > 1 else wave2d_latest(DEFAULT_CASE)
-    file_path = str(resolve_results(run_id))
+    # Данные: run-level results.h5, иначе первая задача (схема 0.96).
+    file_path = str(wave2d_primary_results(run_id))
     out_dir = plots_dir(run_id)
     out_dir.mkdir(parents=True, exist_ok=True)
     print(f"Run: {run_id}\nFile: {file_path}\nPlots -> {out_dir}")

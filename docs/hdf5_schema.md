@@ -4,7 +4,7 @@
 лежит в каталоге задачи
 (`Results/<конфигурация>/<дата-время>/tasks/<задача>/results.h5`). Лаунчер
 дополнительно собирает run-level файл в корне прогона — см.
-«Общий (run-level) файл `results.h5`».
+«Общий (run-level) отчёт `report.h5`».
 
 Основано на модуле `Source/WaveToP/hdf5_writer.f90` (запись) и
 `Source/WaveToP/hdf5_manager.f90` (низкоуровневые операции).
@@ -15,7 +15,7 @@
 
 | Атрибут | Тип | Значение | Смысл |
 |---|---|---|---|
-| `format_version` | string | `0.95` | версия схемы HDF5-файла |
+| `format_version` | string | `0.96` | версия схемы HDF5-файла |
 
 Атрибут пишется один раз при создании файла (`open('NEW')`) в
 `write_report_to_hdf5` и сохраняется при дозаписи (`poloidal_field_2d`) и при
@@ -39,7 +39,10 @@
    - дописывает `/grid`, один блок `/fields/nphi*`, `/flux_surf`,
      `/plasma/params`, `/plasma/bfield`, `/plasma/dielectric`,
      `/plasma/resonance`, `/plasma/wkb`, `/geometry`.
-4. Лаунчер (`launcher/results.py`) после завершения задачи дописывает через
+4. `spectrum_an` (`bin/spectrum_an.exe`, шаг `SpectrumAn`, последний):
+   - открывает файл на дозапись (`open('OLD')`);
+   - пишет run-level группу `/spectrum` (тороидальный спектр антенны `An`).
+5. Лаунчер (`launcher/results.py`) после завершения задачи дописывает через
    `h5py`:
    - `write_git_provenance` — в `/report/toolchain` поля `git_commit`,
      `git_branch`, `git_dirty`;
@@ -66,7 +69,7 @@
 - **Dimension scales**: пока **не привязаны** (нет атрибутов `CLASS`,
   `DIMENSION_LIST`). Оси заданы неявно порядком выше; координаты —
   `grid/rho`, `grid/psi`, а полоидальный угол будет добавлен (`grid/theta_deg`)
-  вместе с scales. План — см. `TODO/p7-hdf5-dimension-scales.md`.
+  вместе с scales. План — см. `TODO/hdf5-dimension-scales.md`.
 - **Единицы**: атрибуты и датасеты записываются в тех единицах, в которых
   величины хранятся в модулях кода. Часть длин нормирована (внутренние
   единицы), плотность/температура/частота — физические; конкретные единицы
@@ -81,7 +84,7 @@
 ## Структура
 
 ```
-results.h5                  # корневой атрибут: format_version = "0.95"
+results.h5                  # корневой атрибут: format_version = "0.96"
 ├── report/                 # провенанс: окружение, инструменты, запуск
 │   │                       #   + атрибуты прогона (только nphi:
 │   │                       #     sum_tasks_time_sec, wall_time_sec)
@@ -114,6 +117,12 @@ results.h5                  # корневой атрибут: format_version = 
 │   ├── resonance/          # w0_wpe, w0_wlh, w0_wuh, w0_wce, Xcutoff_at_0, PolRes_at_0
 │   └── wkb/                # Nrho1, Nrho2 (комплексные)
 ├── flux_surf/              # theta_deg, theta_pi_diff
+├── spectrum/               # тороидальный спектр антенны An(n) (run-level)
+│   ├── attrs: nphi_min, nphi_max, nphistep, Nsmax, dphi_rad,
+│   │          ant_type, grill_type
+│   ├── n                   # (M), int, nphi_min..nphi_max
+│   ├── An                  # (M), complex128, arb. units
+│   └── abs2                # (M), |An|^2, arb. units
 ├── power_balance/          # радиальный энергобаланс по модам nphi (как /fields)
 │   └── nphi+122/           # группа моды (одна в файле задачи;
 │       │                   #   много — в общем файле серии)
@@ -291,6 +300,8 @@ results.h5                  # корневой атрибут: format_version = 
 | `plasma/dielectric/*` | `1` |
 | `plasma/resonance/*` | `1` |
 | `plasma/wkb/Nrho1`, `Nrho2` | `1` |
+| `spectrum/n` | `1` |
+| `spectrum/An`, `spectrum/abs2` | `arb. units` |
 | `flux_surf/theta_deg`, `theta_pi_diff` | `deg` |
 | `fields/nphi*/Ex`, `Ey`, `Ez`, `Ea` | `arb. units` |
 
@@ -344,6 +355,31 @@ results.h5                  # корневой атрибут: format_version = 
 | `dP_tube` | kW | мощность, поглощённая в трубке |
 | `p_ld`, `p_tt`, `p_mx` | kW/cm³ | удельные плотности вкладов |
 
+### `/spectrum` (тороидальный спектр антенны `An(n)`)
+
+Run-level свойство антенны, **не** разбито по модам `nphi`; в файле ровно
+одна группа. Пишет `bin/spectrum_an.exe` (шаг `SpectrumAn`,
+`core/an_spectrum_mod.f90`) в файл **задачи**; для серии по `nphi` лаунчер
+копирует базовый файл целиком, поэтому группа попадает и в общий
+`results.h5`. См. формулу и сверку с `Espctor.dat` в
+`docs/toroidal-amplitudes-an.md`.
+
+- атрибут `nphi_min`, `nphi_max`, `nphistep` — запрошенный диапазон (секция
+  `[spectrum]`);
+- атрибут `Nsmax` — длина тороидального FFT (степень двойки);
+- атрибут `dphi_rad` — `2π/Nsmax`, рад;
+- атрибут `ant_type` — тип антенны (`1` = Grill, из `w2source.inp`);
+- атрибут `grill_type` — `1` = E-grill, `2` = H-grill (из `w2wall.inp`).
+
+| Датасет | Размерность | Единицы | Смысл |
+|---|---|---|---|
+| `n` | `(M)` | 1 | тороидальное число, `nphi_min … nphi_max` |
+| `An` | `(M)` | arb. units | комплексная амплитуда `An(n)` |
+| `abs2` | `(M)` | arb. units | `|An|^2` (ключ упорядочивания серии, P8) |
+
+`M = nphi_max − nphi_min + 1`. Абсолютный масштаб задаёт `Amptor` из
+`w2wall.inp`. Одинаков для всех задач серии — поэтому и хранится один раз.
+
 ### `/plasma/params`
 
 | Датасет | Смысл |
@@ -385,33 +421,21 @@ results.h5                  # корневой атрибут: format_version = 
 
 `Nrho1`, `Nrho2` — два корня радиального показателя преломления (WKB).
 
-## Общий (run-level) файл `results.h5`
+## Общий (run-level) отчёт `report.h5`
 
 Каждый прогон (одна задача или серия) собирает общий файл
-`Results/<конфигурация>/<дата-время>/results.h5` функцией
-`launcher/results.py:merge_results`. Во всех случаях берётся
-`report/toolchain` и из каждой задачи копируется её группа
+`Results/<конфигурация>/<дата-время>/report.h5` функцией
+`launcher/results.py:merge_reports`. Файл **report-only**: он всегда содержит
+`/report` и **никогда** не содержит научных данных. Данные остаются в файлах
+задач `tasks/<task_name>/results.h5` (см. выше); объединение данных — задача
+внешнего просмотрщика результатов (viewer), а не лаунчера.
+
+При сборке берётся `report/toolchain` и из каждой задачи копируется её группа
 `report/<task_name>` (с `system/`, `run/`, `duration/`, `status/` и
 атрибутами); в `/report` пишутся атрибуты прогона (`write_work_times`, см.
 ниже). Кроме того, в `/report` всегда добавляются run-level группы
-`/report/build` и `/report/system_info` (см. ниже). Дальше поведение зависит
-от серии:
-
-- **`nphi`** — базой копируется `results.h5` первой задачи (общие группы
-  `input`, `grid`, `geometry`, `plasma`, `flux_surf` и её собственные
-  `report/<task_name>`, `/fields/nphi*` и `/power_balance/nphi*`), затем из
-  следующих задач добавляются их `/fields/nphi*`, `/power_balance/nphi*` и
-  `report/<task_name>`; в `/input/w2grid`
-  записывается диапазон всей серии: `nphi1 = start`,
-  `nphi2 = start + (number − 1)·step`, `nphistep = step` (в файле отдельной
-  задачи `nphi1 == nphi2 == значение моды`). Только этот случай объединяет
-  данные — при серии по `nphi` общие группы у задач идентичны;
-- **любая другая серия или одиночная задача** — общий файл содержит
-  **только** `/report` (report-only): данные не объединяются, потому что
-  меняющийся параметр (`Nr`, `Mmax`, `freq`, …) меняет формы/значения
-  датасетов. Базовая задача как источник данных сознательно не подставляется,
-  чтобы файл нельзя было принять за результат всей серии. Объединение
-  не-`nphi` данных — будущая работа (`TODO/merge-non-nphi.md`).
+`/report/build` и `/report/system_info` (см. ниже). Файл пересоздаётся с нуля
+(`'w'`), поэтому данные предыдущего merge не могут «протечь» в текущий.
 
 В корень `/report` общего файла дополнительно пишутся атрибуты прогона
 (`write_work_times`):
@@ -459,6 +483,31 @@ Windows его не создаёт — там шаг пропускается). 
 описывает машину, считавшую конкретную задачу. Группа пишется всегда, когда
 известен `system_info`.
 
+## Контракт для внешнего потребителя (viewer)
+
+Обмен между репозиториями Wave2D и viewer'ом идёт только через формат данных
+(HDF5-схему и раскладку каталога), без импорта Python-кода. Viewer читает:
+
+| Что | Где |
+|---|---|
+| Научные данные задачи (`/input`, `/grid`, `/geometry`, `/plasma`, `/fields/nphi*`, `/power_balance/nphi*`, `/flux_surf`, `/spectrum`) | `tasks/<task_name>/results.h5` — **единственный** источник данных |
+| Список и порядок задач | `logs/task_array.txt` (SLURM) либо отсортированные `tasks/*/` |
+| Параметры серии (`var`, `start`, `step`, `number`) | `input.toml` прогона, секция `[series]` |
+| Статусы, тайминги, git, build, system_info прогона | `report.h5`, группа `/report` |
+| Сырой per-task отчёт | `tasks/<task_name>/report.toml` |
+
+Правила:
+
+- диапазон мод серии берите из `[series]` в `input.toml`; в файле задачи
+  `input/w2grid` всегда `nphi1 == nphi2 == значение моды`;
+- run-level `report.h5` не гарантирует наличия данных ни для одной серии;
+- в старых прогонах (до перехода на `report.h5`) данные серии по `nphi` могли
+  лежать в run-level `results.h5` — при чтении старых каталогов учитывайте оба
+  варианта, но приоритет всегда у `tasks/*/results.h5`;
+- версия схемы — корневой атрибут `format_version`; проверяйте его перед
+  чтением. Владелец схемы — репозиторий Wave2D
+  (`Source/WaveToP/hdf5_writer.f90`).
+
 ## Особенности
 
 - **Ось.** Строка `ir = 0` (магнитная ось) заполняется не для всех датасетов:
@@ -475,14 +524,24 @@ Windows его не создаёт — там шаг пропускается). 
 
 ## История схемы и миграция
 
-### Unreleased
+### 0.96 (текущая)
 
+- run-level артефакт разделён: вместо общего `results.h5` (для серии по `nphi`
+  он содержал данные) — report-only `report.h5`; научные данные остаются
+  только в `tasks/<task_name>/results.h5` и объединяются внешним viewer'ом
+  (`launcher/results.py:merge_reports`). **Структура per-task файла не
+  изменилась** — bump `0.95 → 0.96` отражает смену run-level контракта:
+  `report.h5` несовместим со старым combined `results.h5` (в нём больше нет
+  групп `/input`, `/grid`, `/fields/*`, …).
+- добавлена run-level группа `/spectrum` — тороидальный спектр антенны
+  `An(n)` (`n`, `An` комплексный, `abs2 = |An|^2`), пишет
+  `bin/spectrum_an.exe` (шаг `SpectrumAn`); аддитивное изменение.
 - добавлена группа `/power_balance/nphi*` — 1D радиальный энергобаланс,
   который пишет отдельный бинарник `bin/power_balance.exe` (шаг
-  `PowerBalance`); лаунчер объединяет её по модам так же, как `/fields/nphi*`;
-  аддитивное изменение, `format_version` не меняется.
+  `PowerBalance`); аддитивное изменение (объединение по модам теперь на
+  стороне viewer'а).
 
-### 0.95 (текущая)
+### 0.95
 
 - группа `/manifest` переименована в `/report`: общий `/report/toolchain` и
   per-task `/report/<task_name>`;

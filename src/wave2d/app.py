@@ -2,8 +2,8 @@
 
 Дерево строится динамически по файловой системе через
 :class:`~src.common.navigator.Wave2DNavigator` (кейсы → прогоны → задачи),
-в листьях — реальные ``results.h5``. Выбор листа показывает сводку
-``manifest``/``input``; кнопка (или двойной клик) открывает
+в листьях — реальные HDF5-файлы (``results.h5``, ``report.h5``). Выбор листа
+показывает сводку ``report``/``input``; кнопка (или двойной клик) открывает
 :class:`~src.wave2d.viewer.W2DViewer` в отдельном окне ``Toplevel``.
 
 Кнопка **«Открыть»** в шапке позволяет выбрать другую папку Wave2D; выбранный
@@ -30,7 +30,12 @@ from src.common.settings import (
     set_navigator_root,
 )
 from src.common.wsl import wsl_roots
-from src.wave2d.schema import UnsupportedFormatError, ensure_supported_path
+from src.wave2d.schema import (
+    MANIFEST,
+    REPORT,
+    UnsupportedFormatError,
+    ensure_supported_path,
+)
 
 from src.wave2d.viewer import W2DViewer
 
@@ -47,7 +52,7 @@ class W2DNavigatorApp:
         self.root.geometry("980x640")
         self._set_window_icon()
 
-        self._paths: dict[str, Path] = {}  # iid узла -> путь к results.h5
+        self._paths: dict[str, Path] = {}  # iid узла -> путь к HDF5-файлу
         self.selected: Path | None = None
 
         # Проверяем доступность папки до построения навигатора: обращение
@@ -308,7 +313,7 @@ class W2DNavigatorApp:
             self._set_data_root(new_root)
             return
 
-        self._clear_tree("Выберите results.h5 в дереве")
+        self._clear_tree("Выберите файл в дереве")
         cases = self.nav.cases()
         if not cases:
             self.tree.insert("", "end", text="(нет кейсов в каталоге данных)", open=True)
@@ -327,7 +332,7 @@ class W2DNavigatorApp:
                     node = self.tree.insert(
                         case_node, "end", text=run_id.split("/", 1)[1], open=False
                     )
-                self._add_results_node(node, self.nav.results(run_id))
+                self._add_run_artifacts(node, run_id)
                 for task in self.nav.tasks(run_id):
                     task_path = self.nav.task_results(run_id, task)
                     if task_path.is_file():
@@ -336,10 +341,15 @@ class W2DNavigatorApp:
                         )
                         self._add_results_node(task_node, task_path)
 
+    def _add_run_artifacts(self, parent: str, run_id: str) -> None:
+        """Добавляет run-level файлы прогона: ``results.h5`` и/или ``report.h5``."""
+        for path in self.nav.run_artifacts(run_id):
+            self._add_results_node(parent, path)
+
     def _add_results_node(self, parent: str, path: Path) -> None:
         if path.is_file():
             iid = f"file::{path}"
-            self.tree.insert(parent, "end", iid=iid, text="results.h5")
+            self.tree.insert(parent, "end", iid=iid, text=path.name)
             self._paths[iid] = path
 
     def _clear_tree(self, info: str) -> None:
@@ -393,9 +403,9 @@ class W2DNavigatorApp:
         lines = [f"Файл  : {path}", f"Размер: {size_mb:.2f} MB", ""]
         try:
             with H5Reader(path) as reader:
-                # Провенанс: в 0.95 группа /report, в 0.94 — /manifest.
+                # Провенанс: в 0.95+ группа /report, в 0.94 — /manifest.
                 provenance = next(
-                    (p for p in ("/report", "/manifest") if reader.contains(p)),
+                    (p for p in (REPORT, MANIFEST) if reader.contains(p)),
                     None,
                 )
                 if provenance is not None:

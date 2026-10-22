@@ -18,9 +18,14 @@
 Раскладка Wave2D — трёхуровневая: ``<case_id>`` (постановка, напр. ``FT2``)
 содержит прогоны ``<stamp>`` (timestamp, напр. ``2026-09-23_21-58-05``)::
 
-    <wave2d>/<case_id>/<stamp>/results.h5            # общий файл серии
+    <wave2d>/<case_id>/<stamp>/results.h5            # run-level данные (<= 0.95)
+    <wave2d>/<case_id>/<stamp>/report.h5             # run-level отчёт (>= 0.96)
     <wave2d>/<case_id>/<stamp>/tasks/<task>/results.h5
     <wave2d>/<case_id>/results.h5                    # legacy-плоско
+
+Научные данные задачи всегда лежат в ``tasks/<task>/results.h5``. Run-level
+файл данных (``results.h5``) есть только у старых схем; с 0.96 его заменяет
+report-only ``report.h5`` (см. ``docs/hdf5_schema.md``).
 
 Кейсы не хардкодятся — они дискаверятся по файловой системе.
 """
@@ -137,8 +142,30 @@ class Wave2DNavigator(Navigator):
         return base / stamp if stamp else base
 
     def results(self, run_id: str, name: str = "results.h5") -> Path:
-        """Общий файл прогона (напр. серия по ``nphi``)."""
+        """Run-level файл прогона (напр. общий ``results.h5`` серии по ``nphi``)."""
         return self.run_dir(run_id) / name
+
+    def run_report(self, run_id: str, name: str = "report.h5") -> Path:
+        """Run-level отчёт прогона (``report.h5``, схема >= 0.96).
+
+        Файл **report-only**: научных данных в нём нет, данные остаются в
+        ``tasks/<task>/results.h5``. Возвращает путь даже если файла нет —
+        проверяйте существование у вызывающего.
+        """
+        return self.run_dir(run_id) / name
+
+    def run_artifacts(self, run_id: str) -> list[Path]:
+        """Существующие run-level HDF5-файлы прогона.
+
+        Порядок: ``results.h5`` (данные, <= 0.95) → ``report.h5`` (отчёт,
+        >= 0.96). Пустой список, если run-level файлов нет (напр. прогон
+        только из задач).
+        """
+        return [
+            path
+            for path in (self.results(run_id), self.run_report(run_id))
+            if path.is_file()
+        ]
 
     def task_results(
         self, run_id: str, task: str, name: str = "results.h5"
@@ -183,7 +210,10 @@ class Wave2DNavigator(Navigator):
                 f"Доступные кейсы: {self.cases()}"
             )
         runs: list[str] = []
-        if (case_dir / "results.h5").is_file():
+        if any(
+            (case_dir / name).is_file()
+            for name in ("results.h5", "report.h5")
+        ):
             runs.append(case_id)
         runs.extend(
             f"{case_id}/{p.name}"
@@ -271,8 +301,52 @@ def wave2d_dir(run_id: str) -> Path:
 
 
 def wave2d_results(run_id: str, name: str = "results.h5") -> Path:
-    """Общий файл прогона (обёртка над :meth:`Wave2DNavigator.results`)."""
+    """Run-level файл прогона (обёртка над :meth:`Wave2DNavigator.results`)."""
     return default_navigator().wave2d.results(run_id, name)
+
+
+def wave2d_run_report(run_id: str, name: str = "report.h5") -> Path:
+    """Run-level отчёт (обёртка над :meth:`Wave2DNavigator.run_report`)."""
+    return default_navigator().wave2d.run_report(run_id, name)
+
+
+def wave2d_run_artifacts(run_id: str) -> list[Path]:
+    """Run-level файлы (обёртка над :meth:`Wave2DNavigator.run_artifacts`)."""
+    return default_navigator().wave2d.run_artifacts(run_id)
+
+
+def wave2d_primary_results(run_id: str) -> Path:
+    """Файл с научными данными прогона.
+
+    Приоритет: run-level ``results.h5`` → ``tasks/<первая>/results.h5``.
+    В схеме 0.96 run-level файла данных нет — данные только в задачах;
+    ``report.h5`` данными не является и здесь не возвращается. Если нет
+    ни файла, ни задач — возвращается путь к (несуществующему) run-level
+    ``results.h5`` (для понятного сообщения об ошибке у вызывающего).
+    """
+    nav = default_navigator().wave2d
+    path = nav.results(run_id)
+    if path.is_file():
+        return path
+    tasks = nav.tasks(run_id)
+    if tasks:
+        return nav.task_results(run_id, tasks[0])
+    return path
+
+
+def wave2d_viewable(run_id: str) -> Path:
+    """Файл прогона, который можно открыть во viewer.
+
+    Приоритет: :func:`wave2d_primary_results` → run-level ``report.h5``.
+    Позволяет открыть и прогон без научных данных (только провенанс).
+    """
+    path = wave2d_primary_results(run_id)
+    if path.is_file():
+        return path
+    report = wave2d_run_report(run_id)
+    if report.is_file():
+        return report
+    return path
 
 
 def wave2d_task_results(

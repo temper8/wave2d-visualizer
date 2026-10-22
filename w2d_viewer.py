@@ -5,6 +5,9 @@
 Запуск::
 
     uv run w2d_viewer.py [<run_id>]      # по умолчанию — свежий FT-2_LH_smoke_nphi
+
+Файл выбирается как :func:`~src.common.paths.wave2d_viewable`: run-level
+``results.h5`` → первая задача → run-level ``report.h5`` (прогон без данных).
 """
 
 import sys
@@ -12,7 +15,7 @@ import sys
 import tkinter as tk
 from tkinter import messagebox
 
-from src.common.paths import wave2d_results, wave2d_latest
+from src.common.paths import wave2d_latest, wave2d_viewable
 from src.wave2d.schema import UnsupportedFormatError, ensure_supported_path
 from src.wave2d.viewer import W2DViewer
 
@@ -22,7 +25,7 @@ DEFAULT_CASE = "FT-2_LH_smoke_nphi"
 def main(argv: list[str] | None = None) -> None:
     argv = sys.argv[1:] if argv is None else argv
     run_id = argv[0] if argv else wave2d_latest(DEFAULT_CASE)
-    file_path = str(wave2d_results(run_id))
+    file_path = str(wave2d_viewable(run_id))
 
     # Проверяем версию до создания окна, иначе при несовместимом формате
     # останется пустое окно.
