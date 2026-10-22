@@ -8,6 +8,10 @@
 кнопок действий с прогоном. Кнопка (или двойной клик) открывает
 :class:`~src.wave2d.viewer.W2DViewer` в отдельном окне ``Toplevel``.
 
+Кнопка **«Слияние (nphi)»** (активна, когда у прогона ≥ 2 задачи-моды)
+в фоне собирает задачи в ``derived/runs/<case>/<stamp>/nphi_merged.h5``
+(:mod:`src.wave2d.merge`); готовый файл появляется в дереве листом.
+
 Кнопка **«Открыть»** в шапке позволяет выбрать другую папку Wave2D; выбранный
 путь запоминается между запусками через :mod:`src.common.settings`.
 При наличии WSL рядом добавляются кнопки с именами дистрибутивов
@@ -19,12 +23,15 @@
 
 from pathlib import Path
 
+import queue
+import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from src.common import fsprobe
 from src.common.h5reader import H5Reader
 from src.common.navigator import Wave2DNavigator, data_root
+from src.common.paths import merged_results
 from src.common.settings import (
     get_navigator_history,
     get_navigator_root,
@@ -32,6 +39,7 @@ from src.common.settings import (
     set_navigator_root,
 )
 from src.common.wsl import wsl_roots
+from src.wave2d.merge import merge_nphi_tasks, nphi_tasks
 from src.wave2d.schema import (
     MANIFEST,
     REPORT,
@@ -47,7 +55,6 @@ _ICON_PATH = Path(__file__).resolve().parent / "assets" / "w2d_app_icon.png"
 # Кнопки-заглушки панели действий с прогоном (команды появятся позже).
 RUN_ACTIONS = ("Рендер полей", "Спектр", "Открыть папку")
 
-
 class W2DNavigatorApp:
     """Окно выбора прогона Wave2D и запуска просмотрщика."""
 
@@ -60,6 +67,13 @@ class W2DNavigatorApp:
         self._paths: dict[str, Path] = {}  # iid узла -> путь к HDF5-файлу
         self._runs: dict[str, str] = {}  # iid узла-прогона -> run_id
         self.selected: Path | None = None
+
+        # Состояние выбранного прогона и фонового слияния по nphi.
+        self.selected_run: str | None = None
+        self.selected_run_node: str | None = None
+        self._merge_busy = False
+        self._merge_log: list[str] = []
+        self._merge_queue: queue.Queue | None = None
 
         # Проверяем доступность папки до построения навигатора: обращение
         # к мёртвой сетевой шаре иначе виснет на SMB-таймаут ещё до отрисовки.
@@ -244,6 +258,11 @@ class W2DNavigatorApp:
             row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(6, 0)
         )
         self.run_buttons: list[ttk.Button] = []
+        self.merge_btn = ttk.Button(
+            self.actions, text="Слияние (nphi)", command=self.merge_run,
+            state="disabled",
+        )
+        self.merge_btn.pack(side=tk.LEFT, padx=(6, 4), pady=6)
         for text in RUN_ACTIONS:
             btn = ttk.Button(self.actions, text=text, state="disabled")
             btn.pack(side=tk.LEFT, padx=(6, 4), pady=6)
@@ -350,6 +369,7 @@ class W2DNavigatorApp:
                     )
                 self._runs[node] = run_id
                 self._add_run_artifacts(node, run_id)
+                self._add_derived_node(node, run_id)
                 for task in self.nav.tasks(run_id):
                     task_path = self.nav.task_results(run_id, task)
                     if task_path.is_file():
@@ -363,11 +383,20 @@ class W2DNavigatorApp:
         for path in self.nav.run_artifacts(run_id):
             self._add_results_node(parent, path)
 
+    def _add_derived_node(self, parent: str, run_id: str) -> None:
+        """Добавляет производные артефакты прогона (напр. ``nphi_merged.h5``)."""
+        merged = merged_results(run_id)
+        if merged.is_file():
+            self._add_results_node(parent, merged)
+
     def _add_results_node(self, parent: str, path: Path) -> None:
-        if path.is_file():
-            iid = f"file::{path}"
-            self.tree.insert(parent, "end", iid=iid, text=path.name)
-            self._paths[iid] = path
+        if not path.is_file():
+            return
+        iid = f"file::{path}"
+        if iid in self._paths:
+            return
+        self.tree.insert(parent, "end", iid=iid, text=path.name)
+        self._paths[iid] = path
 
     def _clear_tree(self, info: str) -> None:
         """Очищает дерево и инфо-панель, сбрасывая выбор."""
@@ -375,8 +404,10 @@ class W2DNavigatorApp:
         self._paths.clear()
         self._runs.clear()
         self.selected = None
+        self.selected_run = None
+        self.selected_run_node = None
         self.open_btn.configure(state="disabled")
-        self._set_run_buttons(False)
+        self._refresh_run_actions()
         self._set_info(info)
 
     # --- обработчики -----------------------------------------------------
@@ -387,8 +418,10 @@ class W2DNavigatorApp:
         path = self._paths.get(iid) if iid else None
         run_id = self._runs.get(iid) if iid else None
         self.selected = path
+        self.selected_run = run_id
+        self.selected_run_node = iid if run_id is not None else None
         self.open_btn.configure(state="normal" if path else "disabled")
-        self._set_run_buttons(run_id is not None)
+        self._refresh_run_actions()
         if path is not None:
             self._show_file_info(path)
         elif run_id is not None:
@@ -427,6 +460,95 @@ class W2DNavigatorApp:
         state = "normal" if enabled else "disabled"
         for btn in self.run_buttons:
             btn.configure(state=state)
+
+    def _refresh_run_actions(self) -> None:
+        """Синхронизирует панель действий с текущим выбором.
+
+        Кнопка слияния активна, если у выбранного прогона ≥ 2 задачи-моды nphi
+        и слияние сейчас не выполняется.
+        """
+        run_id = self.selected_run
+        self._set_run_buttons(run_id is not None)
+        can_merge = False
+        if run_id is not None and not self._merge_busy:
+            try:
+                can_merge = len(nphi_tasks(run_id)) >= 2
+            except OSError:
+                can_merge = False
+        self.merge_btn.configure(state="normal" if can_merge else "disabled")
+
+    # --- слияние по nphi -------------------------------------------------
+
+    def merge_run(self) -> None:
+        """Собирает задачи-моды выбранного прогона в ``nphi_merged.h5``."""
+        run_id = self.selected_run
+        if run_id is None or self._merge_busy:
+            return
+        out = merged_results(run_id)
+        if out.is_file() and not messagebox.askyesno(
+            "Слияние nphi",
+            f"Объединённый файл уже существует:\n{out}\n\nПересобрать?",
+            parent=self.root,
+        ):
+            return
+
+        self._merge_busy = True
+        self._merge_log = []
+        self._merge_queue = queue.Queue()
+        self._refresh_run_actions()
+        self._set_info(f"Слияние nphi: {run_id}\nФайл: {out}\n\nИдёт сборка…")
+
+        queue_ = self._merge_queue
+
+        def worker() -> None:
+            try:
+                merge_nphi_tasks(run_id, out, progress=queue_.put)
+                queue_.put(("done", out))
+            except Exception as e:  # noqa: BLE001
+                queue_.put(("error", str(e)))
+
+        threading.Thread(target=worker, daemon=True).start()
+        self.root.after(150, self._poll_merge)
+
+    def _poll_merge(self) -> None:
+        """Опросом очереди обновляет панель, пока идёт слияние."""
+        finished: tuple[str, object] | None = None
+        while self._merge_queue is not None:
+            try:
+                item = self._merge_queue.get_nowait()
+            except queue.Empty:
+                break
+            if isinstance(item, tuple):
+                finished = item
+            else:
+                self._merge_log.append(str(item))
+                self._set_info("Слияние nphi:\n" + "\n".join(self._merge_log))
+
+        if finished is None:
+            self.root.after(150, self._poll_merge)
+            return
+
+        kind, payload = finished
+        self._merge_busy = False
+        self._refresh_run_actions()
+        if kind == "done":
+            self._show_merged(Path(payload))
+        else:
+            self._set_info(f"Слияние nphi: ошибка\n{payload}")
+            messagebox.showerror("Слияние nphi", str(payload), parent=self.root)
+
+    def _show_merged(self, path: Path) -> None:
+        """Сообщает о готовом файле и предлагает открыть его во viewer."""
+        self._set_info(f"Слияние nphi готово:\n{path}")
+        node = self.selected_run_node
+        if node is not None and self.tree.exists(node):
+            self._add_results_node(node, path)
+        if messagebox.askyesno(
+            "Слияние nphi",
+            f"Готово:\n{path}\n\nОткрыть во viewer?",
+            parent=self.root,
+        ):
+            self._open_viewer(path)
 
     def _show_run_info(self, run_id: str) -> None:
         """Краткая сводка по прогону: артефакты, задачи, статусы, сборка.

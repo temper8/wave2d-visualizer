@@ -72,6 +72,8 @@ src/
 ├── wave2d/
 │   ├── viewer.py            # W2DViewer — окно просмотра results.h5
 │   ├── app.py               # W2DNavigatorApp — GUI-навигатор по прогонам
+│   ├── merge.py             # слияние задач по nphi -> derived/runs/.../nphi_merged.h5
+│   ├── schema.py            # константы и проверка версии схемы HDF5
 │   └── assets/
 │       ├── w2d_app_icon.png # иконка окна (генератор — tools/make_icon.py)
 │       └── w2d_app_icon.ico # многоразмерный .ico для ярлыка (тот же генератор, --ico)
@@ -118,6 +120,8 @@ data/
 │       ├── raw/*.dat         # nep_z1.dat, polar/rho/time mesh, *.rar
 │       └── converted/z1.h5   # результат elmfire_convert.py
 └── derived/
+    ├── runs/<case_id>/<stamp>/   # производные артефакты прогона (viewer)
+    │   └── nphi_merged.h5        # слияние задач по nphi (кнопка «Слияние»)
     ├── plots/{FT-2_LH_smoke,FT-2_LH_smoke_nphi,FT2}/   # карты полей (w2d_render.py)
     ├── frames/WagD/          # 945 PNG кадров флуктуаций
     ├── video/                # fluctuations_evolution.mp4
@@ -126,10 +130,14 @@ data/
 
 - Все пути — только через `src/common/paths.py` (`wave2d_results`,
   `wave2d_primary_results`, `wave2d_viewable`, `elmfire_raw`,
-  `elmfire_converted`, `frames_dir`, `video_dir`, `plots_dir`, `derived`, ...).
+  `elmfire_converted`, `frames_dir`, `video_dir`, `plots_dir`, `derived`,
+  `run_derived`, `merged_results`, ...).
   Не хардкодить `results.h5` / `report.h5` / `z1.h5` / `Elmfire_WagD`.
   `wave2d_primary_results` — файл с данными (run-level `results.h5` → первая
   задача); `wave2d_viewable` — то же, но с фолбэком на report-only `report.h5`.
+  `run_derived(run_id)` — папка `derived/runs/<case>/<stamp>/` для любых
+  производных артефактов прогона; `merged_results(run_id)` — её
+  `nphi_merged.h5`.
 - Скрипты принимают `run_id` первым аргументом
   (`uv run w2d_render.py FT-2_LH_smoke_nphi/2026-09-29_13-56-49`,
   `uv run elmfire_convert.py WagD`). `w2d_render.py` по умолчанию берёт свежий

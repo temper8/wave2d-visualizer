@@ -14,7 +14,10 @@
     ├── wave2d/<case_id>/results.h5                    # legacy-плоско
     ├── elmfire/<run_id>/raw/*.dat
     ├── elmfire/<run_id>/converted/z1.h5
-    └── derived/{plots,frames,video,coupling}/...
+    └── derived/{runs,plots,frames,video,coupling}/...
+
+``derived/runs/<case_id>/<stamp>/`` — папка производных артефактов прогона
+(напр. ``nphi_merged.h5``) — см. :func:`run_derived` / :func:`merged_results`.
 
 Wave2D-навигацию выполняет :class:`~src.common.navigator.Navigator`.
 ELMFIRE и ``derived`` пока живут модульными функциями — см. ``TODO/``.
@@ -72,6 +75,8 @@ __all__ = [
     "elmfire_raw",
     "elmfire_converted",
     "derived",
+    "run_derived",
+    "merged_results",
     "plots_dir",
     "frames_dir",
     "video_dir",
@@ -102,6 +107,20 @@ def derived(*parts: str) -> Path:
     return data_root().joinpath("derived", *parts)
 
 
+def run_derived(run_id: str, *parts: str) -> Path:
+    """Папка производных артефактов прогона: ``derived/runs/<case>/<stamp>``.
+
+    Сюда пишутся любые результаты, посчитанные viewer'ом по конкретному
+    прогону (слияние по ``nphi``, картинки, интегралы и т.п.).
+    """
+    return derived("runs", *run_id.split("/"), *parts)
+
+
+def merged_results(run_id: str, name: str = "nphi_merged.h5") -> Path:
+    """Объединённый по ``nphi`` файл прогона (собирает viewer)."""
+    return run_derived(run_id, name)
+
+
 def plots_dir(run_id: str | None = None) -> Path:
     return derived("plots", run_id) if run_id else derived("plots")
 
@@ -125,6 +144,7 @@ def ensure_data_root() -> Path:
         "wave2d",
         "elmfire",
         "derived/plots",
+        "derived/runs",
         "derived/frames",
         "derived/video",
         "derived/coupling",
