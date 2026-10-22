@@ -313,7 +313,7 @@ class W2DNavigatorApp:
             self._set_data_root(new_root)
             return
 
-        self._clear_tree("Выберите файл в дереве")
+        self._clear_tree("")
         cases = self.nav.cases()
         if not cases:
             self.tree.insert("", "end", text="(нет кейсов в каталоге данных)", open=True)
@@ -369,6 +369,9 @@ class W2DNavigatorApp:
         self.open_btn.configure(state="normal" if path else "disabled")
         if path is not None:
             self._show_file_info(path)
+        else:
+            # Выбрана папка (кейс/прогон) или ничего — правая панель пуста.
+            self._set_info("")
 
     def on_double(self, event=None) -> None:
         if self.selected is not None:
