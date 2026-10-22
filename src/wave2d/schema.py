@@ -158,6 +158,18 @@ POWER_BALANCE = "/power_balance"
 # Run-level тороидальный спектр антенны An(n) (>= 0.96): n, An, abs2.
 SPECTRUM = "/spectrum"
 
+# --- объединённый файл (производный артефакт viewer'а, см. src/wave2d/merge.py) ---
+
+#: Раскладка, где данные уложены по новой последней оси ``nphi``.
+MERGED_LAYOUT = "merged_layout"
+MERGED_LAYOUT_NPHI_AXIS = "nphi-axis"
+
+#: Координата оси мод в объединённом файле.
+NPHI = "/nphi"
+
+#: Группы, датасеты которых могут нести ось ``nphi`` последней.
+MERGED_GROUPS = (FIELDS, POWER_BALANCE, SPECTRUM)
+
 
 # --- поля по модам nphi --------------------------------------------------
 

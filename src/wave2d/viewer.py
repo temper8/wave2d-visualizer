@@ -28,6 +28,10 @@ from src.wave2d.schema import (
     GRID_RHO,
     GRID_X,
     GRID_Y,
+    MERGED_GROUPS,
+    MERGED_LAYOUT,
+    MERGED_LAYOUT_NPHI_AXIS,
+    NPHI,
     format_version_of,
     open_results,
 )
@@ -138,14 +142,44 @@ class W2DViewer:
         self.dataset_view.show([self._make_selection(path) for path in paths])
 
     def _make_selection(self, path: str) -> Selection:
-        """Собирает :class:`Selection` по одному пути узла."""
+        """Собирает :class:`Selection` по одному пути узла.
+
+        Для объединённого файла (раскладка ``nphi-axis``) в датасетах групп
+        ``/fields``, ``/power_balance``, ``/spectrum`` последняя ось — ``nphi``;
+        координата берётся из ``/nphi``, чтобы область данных дала слайдер моды.
+        """
         kind = self.reader.kind(path)
+        data = None if kind == "group" else self._array(path)
+        mode_axis, mode_values = self._mode_axis(path, data)
         return Selection(
             path=path,
             kind=kind,
             attrs=self._attrs(path),
-            data=None if kind == "group" else self._array(path),
+            data=data,
+            mode_axis=mode_axis,
+            mode_values=mode_values,
         )
+
+    def _mode_axis(
+        self, path: str, data: np.ndarray | None
+    ) -> tuple[int | None, np.ndarray | None]:
+        """Ось мод ``(номер, координата)`` для датасета объединённого файла.
+
+        Ось — последняя, если файл помечен раскладкой ``nphi-axis``, датасет
+        лежит в одной из стековых групп и его последняя размерность совпадает
+        с длиной ``/nphi``. Иначе — ``(None, None)``.
+        """
+        if data is None or data.ndim < 2:
+            return None, None
+        if self.reader.attrs("/").get(MERGED_LAYOUT) != MERGED_LAYOUT_NPHI_AXIS:
+            return None, None
+        group = "/" + path.strip("/").split("/", 1)[0]
+        if group not in MERGED_GROUPS:
+            return None, None
+        values = self._array(NPHI)
+        if values is None or data.shape[-1] != len(values):
+            return None, None
+        return data.ndim - 1, values
 
     def _attrs(self, path: str) -> dict:
         """Атрибуты узла; ошибка чтения — пустой словарь (не роняем окно)."""

@@ -72,7 +72,7 @@ src/
 ├── wave2d/
 │   ├── viewer.py            # W2DViewer — окно просмотра results.h5
 │   ├── app.py               # W2DNavigatorApp — GUI-навигатор по прогонам
-│   ├── merge.py             # слияние задач по nphi -> derived/runs/.../nphi_merged.h5
+│   ├── merge.py             # слияние задач по nphi (3D-стек) -> derived/runs/.../nphi_merged.h5
 │   ├── schema.py            # константы и проверка версии схемы HDF5
 │   └── assets/
 │       ├── w2d_app_icon.png # иконка окна (генератор — tools/make_icon.py)
@@ -121,7 +121,7 @@ data/
 │       └── converted/z1.h5   # результат elmfire_convert.py
 └── derived/
     ├── runs/<case_id>/<stamp>/   # производные артефакты прогона (viewer)
-    │   └── nphi_merged.h5        # слияние задач по nphi (кнопка «Слияние»)
+    │   └── nphi_merged.h5        # 3D-стек задач по nphi (кнопка «Слияние»)
     ├── plots/{FT-2_LH_smoke,FT-2_LH_smoke_nphi,FT2}/   # карты полей (w2d_render.py)
     ├── frames/WagD/          # 945 PNG кадров флуктуаций
     ├── video/                # fluctuations_evolution.mp4
@@ -137,7 +137,8 @@ data/
   задача); `wave2d_viewable` — то же, но с фолбэком на report-only `report.h5`.
   `run_derived(run_id)` — папка `derived/runs/<case>/<stamp>/` для любых
   производных артефактов прогона; `merged_results(run_id)` — её
-  `nphi_merged.h5`.
+  `nphi_merged.h5` (3D-стек по последней оси `nphi`, раскладка
+  `merged_layout="nphi-axis"`; см. `docs/hdf5_schema.md`).
 - Скрипты принимают `run_id` первым аргументом
   (`uv run w2d_render.py FT-2_LH_smoke_nphi/2026-09-29_13-56-49`,
   `uv run elmfire_convert.py WagD`). `w2d_render.py` по умолчанию берёт свежий

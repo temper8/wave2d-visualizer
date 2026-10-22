@@ -1,13 +1,27 @@
-"""Слияние задач Wave2D по моде ``nphi`` в один HDF5-файл.
+"""Слияние задач Wave2D по моде ``nphi`` в один HDF5-файл со стеком по 3-й оси.
 
-Схема 0.96 держит научные данные только в ``tasks/<task>/results.h5`` и
-объединение по модам оставляет внешнему viewer'у (``docs/hdf5_schema.md``,
-раздел «Контракт для внешнего потребителя»). Здесь эта сборка: за основу
-берётся файл первой задачи (``/input``, ``/grid``, ``/geometry``, ``/plasma``,
-``/flux_surf``, ``/spectrum``, ...), а из остальных задач дописываются
-модо-зависимые группы ``/fields/nphi*`` и ``/power_balance/nphi*``. Атрибуты
-``/input/w2grid`` (``nphi1/nphi2/nphistep``) перезаписываются диапазоном серии
-из ``input.toml`` — как в старом общем файле серии (``docs/results_h5.md``).
+Схема 0.96 держит научные данные только в ``tasks/<task>/results.h5``, по
+одной моде на файл. Объединение по модам оставляет внешнему viewer'у
+(``docs/hdf5_schema.md``, раздел «Контракт для внешнего потребителя»), и здесь
+оно делается **не** повторением старых per-mode групп, а укладкой в новую
+последнюю ось ``nphi``:
+
+* ``/fields/<имя>`` — ``(Nr, Ntheta, Nnphi)``;
+* ``/power_balance/<имя>`` — ``(Nr, Nnphi)``;
+* ``/spectrum/<имя>`` — копируется как есть: в файлах задач он одинаков во
+  всех модах и его атрибуты уже описывают всю серию (если датасет всё же
+  зависит от моды — он укладывается по оси ``nphi``, как остальные).
+
+Координата оси — ``/nphi`` (int32), на неё же заведены жёсткие ссылки
+``/<группа>/nphi``. Диапазон серии пишется в ``/input/w2grid``
+(``nphi1/nphi2/nphistep``), как в старом общем файле серии. Чанки нарезаны по
+одной моде (``..., 1``), поэтому чтение одного среза остаётся ленивым.
+
+Модо-независимые группы (``/input``, ``/grid``, ``/geometry``, ``/plasma``,
+``/flux_surf``) копируются из базовой задачи; ``/report`` базовой моды не
+переносится — вместо него корневые атрибуты ``merged_layout``/``merged_from``/
+``merged_modes``. Корневой ``format_version`` сохраняется (>= 0.94), чтобы
+файл открывался viewer'ом.
 
 Готовый файл пишется в ``derived/runs/<case>/<stamp>/nphi_merged.h5``
 (:func:`~src.common.paths.merged_results`).
@@ -20,6 +34,7 @@ from pathlib import Path
 from typing import Callable
 
 import h5py
+import numpy as np
 
 from src.common.paths import (
     merged_results,
@@ -27,12 +42,23 @@ from src.common.paths import (
     wave2d_task_results,
     wave2d_tasks,
 )
-from src.wave2d.schema import FIELDS, POWER_BALANCE
+from src.wave2d.schema import (
+    MERGED_GROUPS,
+    MERGED_LAYOUT,
+    MERGED_LAYOUT_NPHI_AXIS,
+    NPHI,
+    REPORT,
+    SPECTRUM,
+)
 
 Progress = Callable[[str], None]
 
-# Группы, зависящие от моды: их набор различается по задачам и дописывается.
-MODE_GROUPS = (FIELDS, POWER_BALANCE)
+# Группы, которые укладываются по новой оси ``nphi``.
+STACKED_GROUPS = MERGED_GROUPS
+
+# Группы, которые не переносятся из базовой задачи: ``/report`` — отчёт одной
+# моды, для объединённого файла он неверен (провенанс — в корневых атрибутах).
+SKIP_GROUPS = (REPORT,)
 
 # Группа входных параметров с диапазоном серии.
 W2GRID = "/input/w2grid"
@@ -144,42 +170,129 @@ def merge_nphi_tasks(
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     modes = [nphi for nphi, _, _ in tasks]
+    n_modes = len(tasks)
     base_nphi, base_task, base_path = tasks[0]
     report(
         f"База: {base_task} (nphi={base_nphi}), схема {next(iter(versions)) or '?'}, "
-        f"мод: {len(tasks)}"
+        f"мод: {n_modes}"
     )
 
     with h5py.File(out_path, "w") as out:
-        # База — корневые атрибуты (format_version) и все объекты задачи.
+        # База — корневые атрибуты (format_version) и модо-независимые группы.
         with _open_read(base_path) as src:
             for key, value in src.attrs.items():
                 out.attrs[key] = value
             for name in src.keys():
+                if f"/{name}" in STACKED_GROUPS or f"/{name}" in SKIP_GROUPS:
+                    continue
                 src.copy(name, out, name=name)
+        out.attrs[MERGED_LAYOUT] = MERGED_LAYOUT_NPHI_AXIS
+        out.attrs["merged_from"] = run_id
+        out.attrs["merged_modes"] = n_modes
+        report("Скопированы общие группы (input/grid/geometry/plasma/flux_surf)")
 
-        # Модо-зависимые группы из остальных задач.
-        total = len(tasks) - 1
-        for index, (nphi, task, path) in enumerate(tasks[1:], start=1):
-            with _open_read(path) as src:
-                for root in MODE_GROUPS:
-                    if root not in src:
-                        continue
-                    names = list(src[root].keys())
-                    if not names:
-                        continue
-                    out.require_group(root)
-                    for name in names:
-                        dest = f"{root}/{name}"
-                        if dest in out:
-                            continue
-                        src.copy(dest, out, name=dest)
-            report(f"[{index}/{total}] {task} (nphi={nphi})")
+        # Ось мод: координата + жёсткие ссылки в каждой стековой группе.
+        axis = out.create_dataset(NPHI, data=np.asarray(modes, dtype=np.int32))
+        axis.attrs["units"] = "1"
+
+        for group in STACKED_GROUPS:
+            if _stack_group(out, group, tasks, report):
+                out[f"{group}/nphi"] = out[NPHI]
 
         _write_series_range(out, modes)
 
     report(f"Готово: {out_path}")
     return out_path
+
+
+def _mode_container(src: h5py.File, group: str, task: str) -> str:
+    """Путь до датасетов группы в файле задачи.
+
+    У ``/fields`` и ``/power_balance`` это подгруппа моды
+    (``/fields/nphi+000``), у ``/spectrum`` — сама группа (датасеты лежат прямо
+    в ней).
+    """
+    candidate = f"{group}/{task}"
+    return candidate if candidate in src else group
+
+
+def _stack_group(
+    out: h5py.File,
+    group: str,
+    tasks: list[tuple[int, str, Path]],
+    report: Progress,
+) -> bool:
+    """Укладывает одноимённые датасеты группы по новой последней оси ``nphi``.
+
+    Схема группы берётся из базовой задачи. Датасеты, совпадающие во всех модах
+    (напр. вся ``/spectrum`` — она общая для серии), копируются как есть — они
+    не зависят от ``nphi``. Чанки — по одной моде (``..., 1``).
+
+    Возвращает ``True``, если хотя бы один датасет получил ось ``nphi``.
+    """
+    n_modes = len(tasks)
+    with _open_read(tasks[0][2]) as src:
+        if group not in src:
+            return False
+        container = _mode_container(src, group, tasks[0][1])
+        schema = [
+            (name, src[f"{container}/{name}"].shape, src[f"{container}/{name}"].dtype,
+             dict(src[f"{container}/{name}"].attrs))
+            for name in src[container]
+        ]
+        # Атрибуты самой группы — только если датасеты лежат прямо в ней
+        # (у ``/fields`` контейнер — подгруппа моды, её атрибут ``nphi`` лишний).
+        group_attrs = dict(src[group].attrs) if container == group else {}
+
+    constant = {
+        name for name, _, _, _ in schema
+        if group == SPECTRUM and _is_constant(group, name, tasks)
+    }
+
+    stacked = False
+    datasets: dict[str, h5py.Dataset] = {}
+    for name, shape, dtype, attrs in schema:
+        if name in constant:
+            ds = out.create_dataset(f"{group}/{name}", shape=shape, dtype=dtype)
+        else:
+            ds = out.create_dataset(
+                f"{group}/{name}", shape=shape + (n_modes,), dtype=dtype,
+                chunks=shape + (1,),
+            )
+            stacked = True
+        ds.attrs.update(attrs)
+        datasets[name] = ds
+    if group_attrs and group in out:
+        out[group].attrs.update(group_attrs)
+
+    for index, (_nphi, task, path) in enumerate(tasks, start=1):
+        with _open_read(path) as src:
+            container = _mode_container(src, group, task)
+            for name, ds in datasets.items():
+                source = f"{container}/{name}"
+                if source not in src:
+                    continue
+                if name in constant:
+                    if index == 1:
+                        ds[...] = src[source][()]
+                else:
+                    ds[..., index - 1] = src[source][()]
+        report(f"{group} [{index}/{n_modes}]")
+
+    return stacked
+
+def _is_constant(group: str, name: str, tasks: list[tuple[int, str, Path]]) -> bool:
+    """Одинаков ли датасет во всех задачах (тогда он не зависит от ``nphi``)."""
+    def read(path: Path, task: str) -> np.ndarray:
+        with _open_read(path) as fh:
+            container = _mode_container(fh, group, task)
+            return fh[f"{container}/{name}"][()]
+
+    base = read(tasks[0][2], tasks[0][1])
+    for _, task, path in tasks[1:]:
+        if not np.array_equal(read(path, task), base):
+            return False
+    return True
 
 
 def _write_series_range(out: h5py.File, modes: list[int]) -> None:

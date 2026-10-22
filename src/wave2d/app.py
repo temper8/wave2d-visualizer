@@ -9,7 +9,8 @@
 :class:`~src.wave2d.viewer.W2DViewer` в отдельном окне ``Toplevel``.
 
 Кнопка **«Слияние (nphi)»** (активна, когда у прогона ≥ 2 задачи-моды)
-в фоне собирает задачи в ``derived/runs/<case>/<stamp>/nphi_merged.h5``
+в фоне собирает задачи в 3D-стек по оси `nphi` —
+``derived/runs/<case>/<stamp>/nphi_merged.h5``
 (:mod:`src.wave2d.merge`); готовый файл появляется в дереве листом.
 
 Кнопка **«Открыть»** в шапке позволяет выбрать другую папку Wave2D; выбранный

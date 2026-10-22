@@ -4,6 +4,8 @@
 
 - **2D** — изображение датасета: ``(R,Z)`` (если есть координаты) или
   ``(rho,theta)``, с выбором составляющей ``real``/``imag``/``abs`` и colorbar;
+- **3D-стек** — срез объединённого по ``nphi`` файла (последняя ось — моды):
+  слайдер моды + та же отрисовка, что для 2D (поле) или 1D (профиль);
 - **1D** — одна или **несколько** линий против общей оси
   ``index``/``rho``/``psi`` (``rho``/``psi`` — если переданы и совпадают по
   длине у всех рядов) с подписями из атрибута ``units`` и легендой;
@@ -23,7 +25,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import numpy as np
@@ -61,6 +63,10 @@ class Selection:
     kind: str | None = None
     attrs: dict[str, Any] = field(default_factory=dict)
     data: np.ndarray | None = None
+    #: Ось мод (номер) в объединённом файле — последняя ось ``nphi``.
+    mode_axis: int | None = None
+    #: Координаты мод (``/nphi``) для подписи слайдера.
+    mode_values: np.ndarray | None = None
 
 
 class DatasetView(ttk.Frame):
@@ -134,6 +140,8 @@ class DatasetView(ttk.Frame):
         self.view_var = tk.StringVar(value="rz" if self.R is not None else "rho")
         self.comp_var = tk.StringVar(value="abs")
         self.axis_var = tk.StringVar(value="index")
+        self.mode_var = tk.IntVar(value=0)
+        self._mode_label: ttk.Label | None = None
 
         self.fig, self.ax = plt.subplots(
             figsize=(6.5, 5.5), layout="constrained"
@@ -227,6 +235,8 @@ class DatasetView(ttk.Frame):
                 0.5, 0.5, message,
                 ha="center", va="center", transform=self.ax.transAxes,
             )
+        elif mode == "3d":
+            self._draw_stacked()
         elif mode == "1d":
             self._draw_1d()
         elif mode == "2d":
@@ -266,6 +276,8 @@ class DatasetView(ttk.Frame):
         first = selections[0]
         if first.data is None:
             return "attrs", ""
+        if first.mode_axis is not None:
+            return "3d", ""
         if first.data.ndim == 1:
             return "1d", ""
         if first.data.ndim == 2:
@@ -283,10 +295,13 @@ class DatasetView(ttk.Frame):
         """
         for child in self.controls.winfo_children():
             child.destroy()
+        self._mode_label = None
 
         if mode == "2d":
             self._add_view_buttons()
             self._add_comp_buttons()
+        elif mode == "3d":
+            self._add_stacked_controls()
         elif mode == "1d":
             lines = self._line_selections()
             self._add_axis_buttons(lines)
@@ -294,7 +309,6 @@ class DatasetView(ttk.Frame):
                 self._add_comp_buttons()
         if mode in ("1d", "2d"):
             self._add_compare_button()
-
     def _add_view_buttons(self) -> None:
         """2D-вид ``(R,Z)/(rho,theta)``; ``(R,Z)`` — только если есть координаты."""
         options = [("rho", "(rho,theta)")]
@@ -363,6 +377,91 @@ class DatasetView(ttk.Frame):
         for selection in self._selections:
             if selection.data is not None:
                 self._on_add_to_comparison(selection)
+
+    # --- стек по модам (3D) ----------------------------------------------
+
+    def _add_stacked_controls(self) -> None:
+        """Переключатели стека: слайдер моды, затем вид/ось/составляющая."""
+        first = self._selections[0]
+        self._add_mode_scale(first)
+        if first.data is None:
+            return
+        if first.data.ndim - 1 == 2:
+            self._add_view_buttons()
+            self._add_comp_buttons()
+        else:
+            self._add_axis_buttons([replace(first, data=self._slice(first))])
+            if np.iscomplexobj(first.data):
+                self._add_comp_buttons()
+
+    def _add_mode_scale(self, selection: Selection) -> None:
+        """Горизонтальный слайдер индекса моды (последняя ось ``nphi``)."""
+        axis = selection.mode_axis
+        count = 0 if selection.data is None or axis is None else int(selection.data.shape[axis])
+        if count <= 0:
+            return
+        if not 0 <= self.mode_var.get() < count:
+            self.mode_var.set(0)
+        frame = ttk.Frame(self.controls)
+        frame.pack(side=tk.LEFT, padx=(0, 20))
+        ttk.Label(frame, text="мода:").pack(side=tk.LEFT)
+        tk.Scale(
+            frame, from_=0, to=count - 1, orient=tk.HORIZONTAL, showvalue=False,
+            variable=self.mode_var, length=150,
+            command=lambda _value: self.redraw(),
+        ).pack(side=tk.LEFT)
+        self._mode_label = ttk.Label(frame, text=self._mode_value(selection))
+        self._mode_label.pack(side=tk.LEFT, padx=(6, 0))
+
+    def _slice(self, selection: Selection) -> np.ndarray:
+        """Срез по текущему индексу моды (уменьшает размерность на 1)."""
+        data = selection.data
+        axis = selection.mode_axis
+        if data is None or axis is None:
+            return np.asarray([])
+        count = data.shape[axis]
+        index = min(max(int(self.mode_var.get()), 0), count - 1)
+        return data.take(index, axis=axis)
+
+    def _mode_value(self, selection: Selection) -> str:
+        """Подпись текущей моды: ``nphi=<значение>`` или ``#<индекс>``."""
+        index = int(self.mode_var.get())
+        values = selection.mode_values
+        if values is None:
+            return f"#{index}"
+        if 0 <= index < len(values):
+            return f"nphi={int(values[index])}"
+        return ""
+
+    def _draw_stacked(self) -> None:
+        """Рисует срез стека по моде: 2D-карту поля или 1D-профиль."""
+        selection = self._selections[0]
+        if selection.data is None or selection.mode_axis is None:
+            return
+        sliced = self._slice(selection)
+        if self._mode_label is not None:
+            self._mode_label.configure(text=self._mode_value(selection))
+        title = selection.path or ""
+        value = self._mode_value(selection)
+        if value:
+            title = f"{title}  [{value}]"
+        if sliced.ndim == 1:
+            comp = self.comp_var.get()
+            ylabel = self._ylabel(selection.path or "", selection.attrs)
+            x, xlabel = self._active_axis([replace(selection, data=sliced)])
+            draw_curves(
+                self.ax,
+                [(x, component(sliced, comp), ylabel, None)],
+                title=title,
+                xlabel=xlabel,
+                ylabel=ylabel,
+            )
+        else:
+            self._colorbar = draw_2d(
+                self.ax, self.fig, sliced, title=title,
+                view=self.view_var.get(), R=self.R, Z=self.Z,
+                comp=self.comp_var.get(),
+            )
 
     # --- 1D ---------------------------------------------------------------
 
