@@ -7,7 +7,8 @@
 - **3D-стек** — срез файла с осью стека последней (моды ``nphi`` у merged или
   угол ``phi`` у ``total_fields.hdf5``): слайдер оси + та же отрисовка, что для
   2D (поле) или 1D (профиль); для оси ``phi`` — чекбокс «Тороидальный вид»
-  (топ-вид тора со стрелкой на текущем ``phi``);
+  (топ-вид тора: экваториальное сечение ``Z=0`` при наличии ``/geometry/R``
+  либо схема-компас со стрелкой на текущем ``phi``);
 - **1D** — одна или **несколько** линий против общей оси
   ``index``/``rho``/``psi`` (``rho``/``psi`` — если переданы и совпадают по
   длине у всех рядов) с подписями из атрибута ``units`` и легендой;
@@ -40,7 +41,13 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 import tkinter as tk
 from tkinter import ttk
 
-from src.wave2d.renderers import component, draw_2d, draw_curves, draw_toroidal_view
+from src.wave2d.renderers import (
+    component,
+    draw_2d,
+    draw_curves,
+    draw_equatorial_view,
+    draw_toroidal_view,
+)
 
 
 def _units_text(units: Any) -> str:
@@ -82,6 +89,7 @@ class DatasetView(ttk.Frame):
         coords: tuple[np.ndarray, np.ndarray] | None = None,
         rho: tuple[np.ndarray, Any] | None = None,
         psi: tuple[np.ndarray, Any] | None = None,
+        major_radius: np.ndarray | None = None,
         on_add_to_comparison: Callable[[Selection], None] | None = None,
         **kwargs,
     ) -> None:
@@ -90,6 +98,9 @@ class DatasetView(ttk.Frame):
         self._on_add_to_comparison = on_add_to_comparison
         self.Z: np.ndarray | None = None
         self.set_coords(coords)
+        self.major_radius: np.ndarray | None = None
+        self._toroidal_colorbar = None
+        self.set_major_radius(major_radius)
         self._axes: dict[str, tuple[np.ndarray, Any]] = {}
         self.set_axes(rho, psi)
         self._colorbar = None
@@ -112,6 +123,15 @@ class DatasetView(ttk.Frame):
             self.R = self.Z = None
         else:
             self.R, self.Z = coords
+
+    def set_major_radius(self, major_radius: np.ndarray | None) -> None:
+        """Задаёт большой радиус ``R(rho,theta)`` (см) для топ-вида экватора.
+
+        ``None`` — геометрии нет: топ-вид останется схемой-компасом.
+        """
+        self.major_radius = (
+            None if major_radius is None else np.asarray(major_radius)
+        )
 
     def set_axes(
         self,
@@ -497,8 +517,8 @@ class DatasetView(ttk.Frame):
     def _draw_toroidal(self, selection: Selection) -> None:
         """Топ-вид тора рядом с картой, если включён и есть ось ``phi``.
 
-        Схема (данные поля не участвуют): показывает, под каким тороидальным
-        углом взято текущее полоидальное сечение.
+        При наличии ``/geometry/R`` рисуется экваториальное сечение ``Z=0``
+        (данные поля); иначе — схема-компас со стрелкой на текущем ``phi``.
         """
         if selection.mode_name != "phi" or not self.toroidal_var.get():
             return
@@ -508,12 +528,83 @@ class DatasetView(ttk.Frame):
         index = min(max(int(self.mode_var.get()), 0), len(values) - 1)
         self.ax_tor.set_visible(True)
         self.ax_tor.clear()
+        if self._draw_equatorial(selection, index):
+            return
         draw_toroidal_view(
             self.ax_tor, float(values[index]), title=selection.path or ""
         )
 
+    def _draw_equatorial(self, selection: Selection, index: int) -> bool:
+        """Рисует экваториальное сечение ``Z=0`` вместо схемы-компаса.
+
+        Возвращает ``False``, если нет ``/geometry/R`` или не найден мидплейн
+        (тогда вызывающий рисует схему). Точки ``theta=0`` (наружу) и
+        ``theta=180`` (внутрь) кладутся в полярные координаты по большому
+        радиусу; нефизичные сентинелы ``R <= 0`` отбрасываются.
+        """
+        major = self.major_radius
+        data = selection.data
+        phi = selection.mode_values
+        if major is None or data is None or phi is None:
+            return False
+        if data.ndim != 3 or major.shape != data.shape[:2]:
+            return False
+        indices = self._midplane_indices(major)
+        if indices is None:
+            return False
+        i_out, i_in = indices
+        values = component(data, self.comp_var.get())
+        r_out, r_in = major[:, i_out], major[:, i_in]
+        keep_out = np.isfinite(r_out) & (r_out > 0)
+        keep_in = np.isfinite(r_in) & (r_in > 0)
+        if not keep_out.any() or not keep_in.any():
+            return False
+        self._toroidal_colorbar = draw_equatorial_view(
+            self.ax_tor,
+            self.fig,
+            phi_rad=np.asarray(phi, dtype=float),
+            radius_out=r_out[keep_out],
+            radius_in=r_in[keep_in],
+            values_out=values[keep_out, i_out, :],
+            values_in=values[keep_in, i_in, :],
+            current=index,
+            title=selection.path or "",
+        )
+        return True
+
+    def _midplane_indices(
+        self, major: np.ndarray
+    ) -> tuple[int, int] | None:
+        """Индексы ``theta=0`` (наружу) и ``theta=180`` (внутрь) на ``Z=0``.
+
+        При наличии ``(R,Z)`` кандидаты — столбцы с минимальным ``|Z|``;
+        иначе мидплейн берётся по краям большого радиуса. ``None``, если
+        мидплейна в сетке нет.
+        """
+        if self.Z is not None and self.Z.shape == major.shape:
+            zmax = np.abs(self.Z).max(axis=0)
+            span = float(zmax.max())
+            if span <= 0:
+                return None
+            candidates = np.where(zmax <= 1e-6 * span)[0]
+            if len(candidates) < 2:
+                return None
+            column = np.median(major[:, candidates], axis=0)
+            return (
+                int(candidates[int(np.argmax(column))]),
+                int(candidates[int(np.argmin(column))]),
+            )
+        column = np.median(major, axis=0)
+        return int(np.argmax(column)), int(np.argmin(column))
+
     def _hide_toroidal(self) -> None:
         """Прячет и очищает топ-вид (его показывает только :meth:`_draw_stacked`)."""
+        if self._toroidal_colorbar is not None:
+            try:
+                self._toroidal_colorbar.remove()
+            except Exception:
+                pass
+            self._toroidal_colorbar = None
         self.ax_tor.clear()
         self.ax_tor.set_visible(False)
 

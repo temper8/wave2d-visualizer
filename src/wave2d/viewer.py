@@ -24,6 +24,7 @@ from src.wave2d.datasetview import DatasetView, Selection
 from src.wave2d.h5tree import H5TreeView
 from src.wave2d.multiview import AddResult, PlotItem, add_to_comparison
 from src.wave2d.schema import (
+    GEOMETRY_R,
     GRID_PSI,
     GRID_RHO,
     GRID_X,
@@ -97,6 +98,7 @@ class W2DViewer:
         self.dataset_view = DatasetView(
             paned,
             coords=self._load_coords(),
+            major_radius=self._load_major_radius(),
             rho=self._load_axis(GRID_RHO),
             psi=self._load_axis(GRID_PSI),
             on_add_to_comparison=self._add_to_comparison,
@@ -113,6 +115,10 @@ class W2DViewer:
         except Exception:
             pass
         return None
+
+    def _load_major_radius(self) -> np.ndarray | None:
+        """Большой радиус ``R(rho,theta)`` (см) для топ-вида экватора или ``None``."""
+        return self._array(GEOMETRY_R)
 
     def _load_axis(self, path: str) -> tuple[np.ndarray, Any] | None:
         """1D-ось ``(массив, units)`` из файла или ``None`` (нет/ошибка)."""

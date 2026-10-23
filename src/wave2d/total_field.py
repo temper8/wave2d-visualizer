@@ -35,6 +35,7 @@ import numpy as np
 from src.wave2d.schema import (
     FIELDS,
     FORMAT_VERSION_ATTR,
+    GEOMETRY,
     GRID,
     MERGED_LAYOUT,
     MERGED_LAYOUT_NPHI_AXIS,
@@ -230,8 +231,9 @@ def write_total_fields(
     """Пишет результат в ``total_fields.hdf5`` (перезаписывая файл).
 
     Раскладка: ``/fields/{Ex,Ey,Ez,Ea}`` — ``(Nr, Ntheta, Nphi)``; ``/phi`` —
-    ось угла (радианы); ``/nphi`` — использованные моды; ``/spectrum`` и
-    ``/grid`` копируются из merged для трассируемости и отрисовки.
+    ось угла (радианы); ``/nphi`` — использованные моды; ``/spectrum``,
+    ``/grid`` и ``/geometry`` копируются из merged для трассируемости, отрисовки
+    и топ-вида экваториального сечения (``/geometry/R`` — большой радиус, см).
 
     Ось стека помечена корневыми атрибутами ``stack_coord``/``stack_name``
     (``"/phi"``/``"phi"``) — viewer рисует по ней слайдер.
@@ -269,7 +271,7 @@ def write_total_fields(
         ea = group.create_dataset("Ea", data=result.Ea)
         ea.attrs["units"] = "arb. units"
 
-        for absolute in (SPECTRUM, GRID):
+        for absolute in (SPECTRUM, GRID, GEOMETRY):
             if absolute in src:
                 src.copy(absolute, out, name=absolute.lstrip("/"))
 

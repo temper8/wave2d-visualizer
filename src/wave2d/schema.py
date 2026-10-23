@@ -141,6 +141,8 @@ GRID_X = f"{GRID}/X"
 GRID_Y = f"{GRID}/Y"
 
 GEOMETRY = "/geometry"
+#: Большой радиус ``R(rho, theta)`` (см) — для топ-вида экваториального сечения.
+GEOMETRY_R = f"{GEOMETRY}/R"
 FLUX_SURF = "/flux_surf"
 
 PLASMA = "/plasma"

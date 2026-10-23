@@ -120,6 +120,84 @@ def draw_toroidal_view(
     )
 
 
+def draw_equatorial_view(
+    ax: Axes,
+    fig: Figure,
+    *,
+    phi_rad: np.ndarray,
+    radius_out: np.ndarray,
+    radius_in: np.ndarray,
+    values_out: np.ndarray,
+    values_in: np.ndarray,
+    current: int = 0,
+    title: str = "",
+    cmap: str = "viridis",
+) -> Colorbar:
+    """Экваториальное сечение ``Z=0`` в топ-виде тора (данные поля).
+
+    Точки мидплейна для каждого тороидального угла ``phi_rad`` кладутся в
+    полярные координаты ``(R·cos phi, R·sin phi)``, где ``R`` — большой
+    радиус (см): ``radius_out`` — сторона ``theta=0`` (наружу), ``radius_in`` —
+    ``theta=180`` (внутрь). ``values_out``/``values_in`` — та же форма
+    ``(Nr, Nphi)``. Поверх данных — границы плазмы, засечки опорных углов и
+    стрелка-«часовая» на текущем ``phi`` (индекс ``current``). Возвращает
+    colorbar сечения (его снимает вызывающий перед следующей отрисовкой).
+    """
+    phi = np.asarray(phi_rad, dtype=float)
+    r = np.concatenate(
+        [np.asarray(radius_out, dtype=float), np.asarray(radius_in, dtype=float)]
+    )
+    values = np.concatenate(
+        [np.asarray(values_out), np.asarray(values_in)], axis=0
+    )
+    x = np.outer(r, np.cos(phi))
+    y = np.outer(r, np.sin(phi))
+    mesh = ax.scatter(
+        x.ravel(), y.ravel(), c=values.ravel(),
+        s=6, cmap=cmap, marker="s", linewidths=0,
+    )
+    r_max = float(r.max())
+    for radius in (r_max, float(r.min())):
+        ax.add_patch(Circle((0.0, 0.0), radius, fill=False, color="0.5", lw=0.8))
+    limit = 1.12 * r_max
+    for deg in (0, 90, 180, 270):
+        angle = np.deg2rad(deg)
+        cos, sin = np.cos(angle), np.sin(angle)
+        ax.plot(
+            [0.94 * limit * cos, limit * cos],
+            [0.94 * limit * sin, limit * sin],
+            color="0.6", lw=0.8,
+        )
+        ax.text(
+            1.02 * limit * cos, 1.02 * limit * sin, f"{deg}°",
+            ha="center", va="center", fontsize=6, color="0.4",
+        )
+    if 0 <= current < len(phi):
+        angle = float(phi[current])
+        ax.annotate(
+            "",
+            xy=(r_max * np.cos(angle), r_max * np.sin(angle)),
+            xytext=(0.0, 0.0),
+            arrowprops=dict(
+                arrowstyle="-|>", lw=1.8, color="crimson", mutation_scale=12
+            ),
+        )
+    ax.set_aspect("equal")
+    ax.set_xlim(-limit, limit)
+    ax.set_ylim(-limit, limit)
+    ax.set_axis_off()
+    ax.set_title(
+        f"{title} (топ-вид Z=0)" if title else "топ-вид Z=0", fontsize=8
+    )
+    if 0 <= current < len(phi):
+        ax.text(
+            0.5, -0.03, f"phi = {np.rad2deg(float(phi[current])):.1f}°",
+            transform=ax.transAxes, ha="center", va="top", fontsize=8,
+        )
+    cax = make_axes_locatable(ax).append_axes("right", size=0.14, pad=0.06)
+    return fig.colorbar(mesh, cax=cax)
+
+
 Curve = tuple[np.ndarray | None, np.ndarray, str, str | None]
 """1D-ряд для :func:`draw_curves`: ``(x, y, label, color)``.
 
