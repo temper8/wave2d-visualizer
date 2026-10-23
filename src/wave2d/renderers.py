@@ -141,8 +141,9 @@ def draw_equatorial_view(
     ``theta=180`` (внутрь). ``values_out``/``values_in`` — та же форма
     ``(Nr, Nphi)``. Поверх данных — границы плазмы, засечки опорных углов и
     стрелка-«часовая» на текущем ``phi`` (индекс ``current``); стрелка кончается
-    на **внутренней** границе кольца, чтобы не теряться в данных. Возвращает
-    colorbar сечения (его снимает вызывающий перед следующей отрисовкой).
+    на **внутренней** границе кольца, а от неё до внешней границы идёт тонкая
+    яркая линия того же цвета и толщины (подсветка выбранного ``phi``-луча).
+    Возвращает colorbar сечения (его снимает вызывающий перед следующей отрисовкой).
     """
     phi = np.asarray(phi_rad, dtype=float)
     r = np.concatenate(
@@ -176,9 +177,16 @@ def draw_equatorial_view(
         )
     if 0 <= current < len(phi):
         angle = float(phi[current])
+        cos, sin = np.cos(angle), np.sin(angle)
+        # Подсветка выбранного луча: от внутренней до внешней границы кольца.
+        ax.plot(
+            [r_min * cos, r_max * cos],
+            [r_min * sin, r_max * sin],
+            color="crimson", lw=1.8, solid_capstyle="round",
+        )
         ax.annotate(
             "",
-            xy=(r_min * np.cos(angle), r_min * np.sin(angle)),
+            xy=(r_min * cos, r_min * sin),
             xytext=(0.0, 0.0),
             arrowprops=dict(
                 arrowstyle="-|>", lw=1.8, color="crimson", mutation_scale=12
