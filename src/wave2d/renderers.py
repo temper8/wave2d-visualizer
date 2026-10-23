@@ -213,7 +213,7 @@ def draw_equatorial_view(
     ax.set_ylim(-limit, limit)
     ax.set_axis_off()
     ax.set_title(
-        f"{title} (топ-вид Z=0)" if title else "топ-вид Z=0", fontsize=8
+        f"{title} (экватор Z=0)" if title else "экватор Z=0", fontsize=8
     )
     if 0 <= current < len(phi):
         ax.text(

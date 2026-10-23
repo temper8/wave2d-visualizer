@@ -6,7 +6,7 @@
   ``(rho,theta)``, с выбором составляющей ``real``/``imag``/``abs`` и colorbar;
 - **3D-стек** — срез файла с осью стека последней (моды ``nphi`` у merged или
   угол ``phi`` у ``total_fields.hdf5``): слайдер оси + та же отрисовка, что для
-  2D (поле) или 1D (профиль); для оси ``phi`` — чекбокс «Тороидальный вид»
+  2D (поле) или 1D (профиль); для оси ``phi`` — чекбокс «Экватор (Z=0)»
   (топ-вид тора: экваториальное сечение ``Z=0`` при наличии ``/geometry/R``
   либо схема-компас со стрелкой на текущем ``phi``);
 - **1D** — одна или **несколько** линий против общей оси
@@ -165,7 +165,7 @@ class DatasetView(ttk.Frame):
         self.comp_var = tk.StringVar(value="abs")
         self.axis_var = tk.StringVar(value="index")
         self.mode_var = tk.IntVar(value=0)
-        #: Чекбокс «Тороидальный вид» (топ-вид тора рядом с полоидальной картой).
+        #: Чекбокс «Экватор (Z=0)» (топ-вид тора рядом с полоидальной картой).
         self.toroidal_var = tk.BooleanVar(value=True)
         #: Чекбокс «Заливка» (топ-вид экватора через ``pcolormesh`` вместо маркеров).
         self.fill_var = tk.BooleanVar(value=False)
@@ -450,7 +450,7 @@ class DatasetView(ttk.Frame):
         self._mode_label.pack(side=tk.LEFT, padx=(6, 0))
 
     def _add_toroidal_toggle(self) -> None:
-        """Чекбоксы топ-вида: «Тороидальный вид» и «Заливка» экватора.
+        """Чекбоксы топ-вида: «Экватор (Z=0)» и «Заливка» экватора.
 
         Доступны только датасетам с осью ``phi`` (``total_fields.hdf5``) —
         то есть выставляются для каждой компоненты (``Ex``/``Ey``/``Ez``/``Ea``).
@@ -459,7 +459,7 @@ class DatasetView(ttk.Frame):
         """
         ttk.Checkbutton(
             self.controls,
-            text="Тороидальный вид",
+            text="Экватор (Z=0)",
             variable=self.toroidal_var,
             command=self.redraw,
         ).pack(side=tk.LEFT, padx=(0, 20))
