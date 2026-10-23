@@ -558,7 +558,9 @@ class W2DNavigatorApp:
         """Синхронизирует панель действий с текущим выбором.
 
         Кнопка слияния активна, если у выбранного прогона ≥ 2 задачи-моды nphi
-        и слияние сейчас не выполняется.
+        и слияние сейчас не выполняется. Моды считаются **без** ``stat`` по
+        каждой задаче (``check_files=False``): иначе выбор узла прогона с 245
+        модами на сетевой шаре замирает на секунды.
         """
         run_id = self.selected_run
         self._set_run_buttons(run_id is not None)
@@ -566,7 +568,7 @@ class W2DNavigatorApp:
         can_merge = False
         if run_id is not None and not busy:
             try:
-                can_merge = len(nphi_tasks(run_id)) >= 2
+                can_merge = len(nphi_tasks(run_id, check_files=False)) >= 2
             except OSError:
                 can_merge = False
         self.merge_btn.configure(state="normal" if can_merge else "disabled")
@@ -768,7 +770,7 @@ class W2DNavigatorApp:
                         None,
                     )
                     if prov is not None:
-                        report = reader.attrs_recursive(prov)
+                        report = self._shallow_attrs(reader, prov)
             except Exception as e:  # noqa: BLE001
                 lines.append(f"(не удалось прочитать {artifacts[0].name}: {e})")
 
@@ -831,6 +833,26 @@ class W2DNavigatorApp:
 
         self._set_info("\n".join(lines))
 
+    @staticmethod
+    def _shallow_attrs(reader: H5Reader, root: str) -> dict[str, dict]:
+        """Атрибуты ``root`` и его прямых детей (без глубокого обхода).
+
+        :meth:`H5Reader.attrs_recursive` обходит всё поддерево ``/report`` —
+        у прогона с 245 задачами это ~1200 объектов и ~7000 атрибутов, а на
+        сетевой шаре ~1.5 с на каждый клик. Для сводки нужны лишь статусы
+        задач и ``build``/``system_info`` — это прямые дети ``/report``.
+        """
+        result: dict[str, dict] = {}
+        if root not in reader.file:
+            return result
+        result[root] = reader.attrs(root)
+        for key in reader.keys(root):
+            try:
+                result[key] = reader.attrs(f"{root}/{key}")
+            except (KeyError, OSError):
+                continue
+        return result
+
     def _task_summary(self, tasks: list[str]) -> str:
         """Краткое описание задач: ``5 (nphi -122…+122)`` или просто число."""
         if not tasks:
@@ -879,7 +901,7 @@ class W2DNavigatorApp:
                     None,
                 )
                 if provenance is not None:
-                    manifest = reader.manifest()
+                    manifest = self._shallow_attrs(reader, provenance)
                     if manifest:
                         lines.append(f"{provenance.strip('/')}:")
                         lines.extend(self._format_params(manifest, provenance))

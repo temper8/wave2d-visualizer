@@ -104,11 +104,17 @@ def series_modes(run_id: str) -> list[int] | None:
     return [start + step * i for i in range(number)]
 
 
-def nphi_tasks(run_id: str) -> list[tuple[int, str, Path]]:
+def nphi_tasks(
+    run_id: str, check_files: bool = True
+) -> list[tuple[int, str, Path]]:
     """Задачи-моды прогона: ``(nphi, имя задачи, путь к results.h5)``.
 
     Порядок — как в ``[series]`` из ``input.toml``; если секции нет — по
-    возрастанию ``nphi``. Задачи без файла ``results.h5`` пропускаются.
+    возрастанию ``nphi``. При ``check_files=True`` задачи без файла
+    ``results.h5`` пропускаются. При ``check_files=False`` ``stat`` по каждой
+    задаче не делается (в GUI это 245 обращений к сетевой шаре на каждый
+    клик) — возвращённые пути не гарантированно существуют, годится только
+    для подсчёта мод (напр. включения кнопки слияния).
     """
     found: dict[int, tuple[str, Path]] = {}
     for task in wave2d_tasks(run_id):
@@ -116,7 +122,7 @@ def nphi_tasks(run_id: str) -> list[tuple[int, str, Path]]:
         if nphi is None:
             continue
         path = wave2d_task_results(run_id, task)
-        if path.is_file():
+        if not check_files or path.is_file():
             found[nphi] = (task, path)
 
     modes = series_modes(run_id)

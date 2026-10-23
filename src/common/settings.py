@@ -85,6 +85,11 @@ def set_navigator_root(name: str, path: str | Path) -> None:
     roots[name] = str(Path(path).expanduser().resolve())
     data[_NAVIGATOR_ROOTS] = roots
     save_settings(data)
+    # Кэш фасада навигатора держит старый корень — сбрасываем (ленивый импорт
+    # от циклической зависимости settings <-> navigator).
+    from src.common.navigator import reset_default_navigator
+
+    reset_default_navigator()
 
 
 def get_navigator_history(name: str) -> list[Path]:

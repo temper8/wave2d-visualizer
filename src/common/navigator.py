@@ -49,13 +49,23 @@ def data_root() -> Path:
     """Корень данных: ``WAVE2D_DATA_DIR`` или ``<repo>/data``."""
     env = os.environ.get("WAVE2D_DATA_DIR")
     if env:
-        return Path(env).expanduser().resolve()
+        return _abs_path(Path(env).expanduser())
     return _REPO_ROOT / "data"
+
+
+def _abs_path(path: Path) -> Path:
+    """Абсолютный путь **без** ``resolve()``.
+
+    ``Path.resolve()`` на Windows зовёт ``nt._getfinalpathname`` — по UNC/WSL
+    это сетевой запрос в единицы миллисекунд. Для корней навигатора
+    канонизация не нужна, а вызов идёт на каждую задачу (сотни раз).
+    """
+    return path if path.is_absolute() else Path(os.path.abspath(path))
 
 
 def _resolve_root(root: str | Path | None) -> Path:
     if root is not None:
-        return Path(root).expanduser().resolve()
+        return _abs_path(Path(root).expanduser())
     return data_root()
 
 
@@ -273,6 +283,10 @@ class DerivedNavigator(Navigator):
 
 # --- фасад ----------------------------------------------------------------
 
+#: Кэш фасада, см. :func:`default_navigator`.
+_default_navigator: DataNavigator | None = None
+
+
 class DataNavigator:
     """Фасад: одна точка входа для всех слоёв данных.
 
@@ -297,8 +311,23 @@ class DataNavigator:
 
 
 def default_navigator() -> DataNavigator:
-    """Фасад с папками по умолчанию (настройки или ``data_root()``)."""
-    return DataNavigator()
+    """Фасад с папками по умолчанию (настройки или ``data_root()``).
+
+    Результат кэшируется. Конструктор резолвит пути каждого слоя и читает
+    настройки, а обёртки (``wave2d_task_results`` и т.п.) зовут его на каждую
+    задачу — без кэша это сотни лишних обращений к ФС/JSON. Сброс кэша —
+    :func:`reset_default_navigator` (делается при смене корня в настройках).
+    """
+    global _default_navigator
+    if _default_navigator is None:
+        _default_navigator = DataNavigator()
+    return _default_navigator
+
+
+def reset_default_navigator() -> None:
+    """Сбрасывает кэш :func:`default_navigator` (напр. после смены корня)."""
+    global _default_navigator
+    _default_navigator = None
 
 
 def wave2d_dir(run_id: str) -> Path:
