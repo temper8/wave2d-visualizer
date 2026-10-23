@@ -80,14 +80,14 @@ def ensure_supported(reader: H5Reader) -> tuple[int, int]:
     version = format_version_of(reader)
     if version is None:
         raise UnsupportedFormatError(
-            f"Файл '{reader.path}': формат не поддерживается — "
-            f"нет атрибута '{FORMAT_VERSION_ATTR}' или он не распознан "
-            f"(нужен >= {format_min_str()})."
+            f"File '{reader.path}': format not supported — "
+            f"missing attribute '{FORMAT_VERSION_ATTR}' or it is not recognized "
+            f"(need >= {format_min_str()})."
         )
     if version < MIN_FORMAT:
         raise UnsupportedFormatError(
-            f"Файл '{reader.path}': формат {version[0]}.{version[1]:02d} "
-            f"не поддерживается (нужен >= {format_min_str()})."
+            f"File '{reader.path}': format {version[0]}.{version[1]:02d} "
+            f"not supported (need >= {format_min_str()})."
         )
     return version
 

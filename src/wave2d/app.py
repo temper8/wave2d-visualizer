@@ -63,7 +63,7 @@ _ICON_PATH = Path(__file__).resolve().parent / "assets" / "w2d_app_icon.png"
 
 # Кнопки-заглушки панели действий с прогоном (команды появятся позже).
 # «Рендер полей» реализована отдельно — см. :meth:`W2DNavigatorApp.render_fields`.
-RUN_ACTIONS = ("Спектр", "Открыть папку")
+RUN_ACTIONS = ("Spectrum", "Open folder")
 
 class W2DNavigatorApp:
     """Окно выбора прогона Wave2D и запуска просмотрщика."""
@@ -146,7 +146,7 @@ class W2DNavigatorApp:
         chosen: dict[str, Path | None] = {"path": None}
 
         dlg = tk.Toplevel(self.root)
-        dlg.title("Папка данных недоступна")
+        dlg.title("Data folder unavailable")
         dlg.transient(self.root)
         dlg.resizable(False, False)
 
@@ -154,9 +154,9 @@ class W2DNavigatorApp:
             dlg,
             justify="left",
             text=(
-                "Папка недоступна:\n"
+                "Folder unavailable:\n"
                 f"{unavailable}\n\n"
-                "Выберите другую папку из истории или укажите вручную:"
+                "Pick another folder from history or choose one manually:"
             ),
         ).pack(fill=tk.X, padx=10, pady=(10, 6))
 
@@ -180,7 +180,7 @@ class W2DNavigatorApp:
         def browse() -> None:
             selected = filedialog.askdirectory(
                 parent=dlg,
-                title="Выберите папку Wave2D",
+                title="Choose Wave2D folder",
                 mustexist=True,
             )
             if not selected:
@@ -188,7 +188,7 @@ class W2DNavigatorApp:
             path = Path(selected)
             if not fsprobe.is_dir(path):
                 messagebox.showwarning(
-                    "Папка недоступна", f"Папка не найдена:\n{path}", parent=dlg
+                    "Folder unavailable", f"Folder not found:\n{path}", parent=dlg
                 )
                 return
             chosen["path"] = path
@@ -196,14 +196,14 @@ class W2DNavigatorApp:
 
         buttons = ttk.Frame(dlg)
         buttons.pack(fill=tk.X, padx=10, pady=(0, 10))
-        open_btn = ttk.Button(buttons, text="Открыть", command=accept)
+        open_btn = ttk.Button(buttons, text="Open", command=accept)
         open_btn.pack(side=tk.LEFT)
         if not available:
             open_btn.state(["disabled"])
-        ttk.Button(buttons, text="Обзор…", command=browse).pack(
+        ttk.Button(buttons, text="Browse…", command=browse).pack(
             side=tk.LEFT, padx=(6, 0)
         )
-        ttk.Button(buttons, text="Выход", command=dlg.destroy).pack(side=tk.RIGHT)
+        ttk.Button(buttons, text="Exit", command=dlg.destroy).pack(side=tk.RIGHT)
 
         listbox.bind("<Double-1>", lambda _e: accept())
         dlg.bind("<Return>", lambda _e: accept())
@@ -240,12 +240,12 @@ class W2DNavigatorApp:
         self.data_label = ttk.Menubutton(header, text="")
         self.data_label.pack(side=tk.LEFT)
         self._update_folder_menu()
-        ttk.Button(header, text="Обновить", command=self.populate).pack(side=tk.RIGHT)
+        ttk.Button(header, text="Refresh", command=self.populate).pack(side=tk.RIGHT)
         for name, path in wsl_roots():
             ttk.Button(
                 header, text=name, command=lambda p=path: self.choose_data_root(p)
             ).pack(side=tk.RIGHT, padx=(0, 4))
-        ttk.Button(header, text="Открыть", command=self.choose_data_root).pack(
+        ttk.Button(header, text="Open", command=self.choose_data_root).pack(
             side=tk.RIGHT, padx=(0, 4)
         )
 
@@ -275,18 +275,18 @@ class W2DNavigatorApp:
         right.rowconfigure(0, weight=1)
         right.columnconfigure(0, weight=1)
 
-        self.actions = ttk.LabelFrame(right, text="Действия с прогоном")
+        self.actions = ttk.LabelFrame(right, text="Run actions")
         self.actions.grid(
             row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(6, 0)
         )
         self.run_buttons: list[ttk.Button] = []
         self.merge_btn = ttk.Button(
-            self.actions, text="Слияние (nphi)", command=self.merge_run,
+            self.actions, text="Merge (nphi)", command=self.merge_run,
             state="disabled",
         )
         self.merge_btn.pack(side=tk.LEFT, padx=(6, 4), pady=6)
         self.render_btn = ttk.Button(
-            self.actions, text="Рендер полей", command=self.render_fields,
+            self.actions, text="Render fields", command=self.render_fields,
             state="disabled",
         )
         self.render_btn.pack(side=tk.LEFT, padx=(6, 4), pady=6)
@@ -296,7 +296,7 @@ class W2DNavigatorApp:
             self.run_buttons.append(btn)
 
         self.open_btn = ttk.Button(
-            right, text="Открыть viewer", command=self.open_selected,
+            right, text="Open viewer", command=self.open_selected,
             state="disabled",
         )
         self.open_btn.grid(row=2, column=0, columnspan=2, sticky="ew", pady=6, padx=6)
@@ -316,15 +316,15 @@ class W2DNavigatorApp:
                     command=lambda p=path: self.open_from_history(p),
                 )
         else:
-            menu.add_command(label="(история пуста)", state="disabled")
+            menu.add_command(label="(history is empty)", state="disabled")
         self.data_label["menu"] = menu
 
     def open_from_history(self, path: Path) -> None:
         """Переключается на папку из истории; если её нет — предупреждает."""
         if not fsprobe.is_dir(path):
             messagebox.showwarning(
-                "Папка недоступна",
-                f"Папка не найдена:\n{path}",
+                "Folder unavailable",
+                f"Folder not found:\n{path}",
                 parent=self.root,
             )
             return
@@ -339,7 +339,7 @@ class W2DNavigatorApp:
         """Переключает навигатор на папку, сохраняет её и историю."""
         if not fsprobe.is_dir(path):
             messagebox.showwarning(
-                "Папка недоступна", f"Папка не найдена:\n{path}", parent=self.root
+                "Folder unavailable", f"Folder not found:\n{path}", parent=self.root
             )
             return
         self.nav = Wave2DNavigator(path)
@@ -355,7 +355,7 @@ class W2DNavigatorApp:
         """
         selected = filedialog.askdirectory(
             parent=self.root,
-            title="Выберите папку Wave2D",
+            title="Choose Wave2D folder",
             initialdir=str(initialdir or self.nav.root),
             mustexist=True,
         )
@@ -370,7 +370,7 @@ class W2DNavigatorApp:
         if not fsprobe.is_dir(self.nav.root):
             new_root = self._prompt_data_root(self.nav.root)
             if new_root is None:
-                self._clear_tree(f"Папка недоступна:\n{self.nav.root}")
+                self._clear_tree(f"Folder unavailable:\n{self.nav.root}")
                 return
             self._set_data_root(new_root)
             return
@@ -378,7 +378,7 @@ class W2DNavigatorApp:
         self._clear_tree("")
         cases = self.nav.cases()
         if not cases:
-            self.tree.insert("", "end", text="(нет кейсов в каталоге данных)", open=True)
+            self.tree.insert("", "end", text="(no cases in the data folder)", open=True)
             return
 
         for case_id in cases:
@@ -514,7 +514,7 @@ class W2DNavigatorApp:
             self._show_file_info(path)
         elif iid is not None and iid in self._missing:
             self._set_info(
-                f"Файл задачи отсутствует:\n{self._task_files.get(iid)}"
+                f"Task file missing:\n{self._task_files.get(iid)}"
             )
         elif run_id is not None:
             self._show_run_info(run_id)
@@ -539,13 +539,13 @@ class W2DNavigatorApp:
         # недоступной шаре/несовместимом формате останется пустой Toplevel.
         if not fsprobe.is_file(path):
             messagebox.showerror(
-                "Файл недоступен", f"Файл не найден:\n{path}", parent=self.root
+                "File unavailable", f"File not found:\n{path}", parent=self.root
             )
             return
         try:
             ensure_supported_path(path)
         except UnsupportedFormatError as e:
-            messagebox.showerror("Формат не поддерживается", str(e), parent=self.root)
+            messagebox.showerror("Unsupported format", str(e), parent=self.root)
             return
         W2DViewer(tk.Toplevel(self.root), str(path))
 
@@ -591,8 +591,8 @@ class W2DNavigatorApp:
             return
         out = merged_results(run_id)
         if out.is_file() and not messagebox.askyesno(
-            "Слияние nphi",
-            f"Объединённый файл уже существует:\n{out}\n\nПересобрать?",
+            "Merge nphi",
+            f"Merged file already exists:\n{out}\n\nRebuild?",
             parent=self.root,
         ):
             return
@@ -601,7 +601,7 @@ class W2DNavigatorApp:
         self._merge_log = []
         self._merge_queue = queue.Queue()
         self._refresh_run_actions()
-        self._set_info(f"Слияние nphi: {run_id}\nФайл: {out}\n\nИдёт сборка…")
+        self._set_info(f"Merge nphi: {run_id}\nFile: {out}\n\nMerging…")
 
         queue_ = self._merge_queue
 
@@ -627,7 +627,7 @@ class W2DNavigatorApp:
                 finished = item
             else:
                 self._merge_log.append(str(item))
-                self._set_info("Слияние nphi:\n" + "\n".join(self._merge_log))
+                self._set_info("Merge nphi:\n" + "\n".join(self._merge_log))
 
         if finished is None:
             self.root.after(150, self._poll_merge)
@@ -639,18 +639,18 @@ class W2DNavigatorApp:
         if kind == "done":
             self._show_merged(Path(payload))
         else:
-            self._set_info(f"Слияние nphi: ошибка\n{payload}")
-            messagebox.showerror("Слияние nphi", str(payload), parent=self.root)
+            self._set_info(f"Merge nphi: error\n{payload}")
+            messagebox.showerror("Merge nphi", str(payload), parent=self.root)
 
     def _show_merged(self, path: Path) -> None:
         """Сообщает о готовом файле и предлагает открыть его во viewer."""
-        self._set_info(f"Слияние nphi готово:\n{path}")
+        self._set_info(f"Merge nphi done:\n{path}")
         node = self.selected_run_node
         if node is not None and self.tree.exists(node):
             self._add_results_node(node, path)
         if messagebox.askyesno(
-            "Слияние nphi",
-            f"Готово:\n{path}\n\nОткрыть во viewer?",
+            "Merge nphi",
+            f"Done:\n{path}\n\nOpen in viewer?",
             parent=self.root,
         ):
             self._open_viewer(path)
@@ -670,15 +670,15 @@ class W2DNavigatorApp:
         merged = merged_results(run_id)
         if not fsprobe.is_file(merged):
             messagebox.showinfo(
-                "Рендер полей",
-                f"Нет объединённого файла:\n{merged}\n\n"
-                "Сначала выполните «Слияние (nphi)».",
+                "Render fields",
+                f"No merged file:\n{merged}\n\n"
+                "Run \"Merge (nphi)\" first.",
                 parent=self.root,
             )
             return
         samples = simpledialog.askinteger(
-            "Рендер полей",
-            "Число точек по углу phi (равномерно по [0, 360°)):",
+            "Render fields",
+            "Number of phi samples (evenly over [0, 360°)):",
             parent=self.root, initialvalue=4, minvalue=1, maxvalue=1000,
         )
         if samples is None:
@@ -691,9 +691,9 @@ class W2DNavigatorApp:
         self._render_queue = queue.Queue()
         self._refresh_run_actions()
         self._set_info(
-            f"Рендер полей: {run_id}\n"
-            f"Источник: {merged}\n"
-            f"phi: {samples} точек\nФайл: {out}\n\nИдёт расчёт…"
+            f"Render fields: {run_id}\n"
+            f"Source: {merged}\n"
+            f"phi: {samples} samples\nFile: {out}\n\nComputing…"
         )
 
         queue_ = self._render_queue
@@ -721,7 +721,7 @@ class W2DNavigatorApp:
                 finished = item
             else:
                 self._render_log.append(str(item))
-                self._set_info("Рендер полей:\n" + "\n".join(self._render_log))
+                self._set_info("Render fields:\n" + "\n".join(self._render_log))
 
         if finished is None:
             self.root.after(150, self._poll_render)
@@ -733,18 +733,18 @@ class W2DNavigatorApp:
         if kind == "done":
             self._show_total_fields(Path(payload))
         else:
-            self._set_info(f"Рендер полей: ошибка\n{payload}")
-            messagebox.showerror("Рендер полей", str(payload), parent=self.root)
+            self._set_info(f"Render fields: error\n{payload}")
+            messagebox.showerror("Render fields", str(payload), parent=self.root)
 
     def _show_total_fields(self, path: Path) -> None:
         """Сообщает о готовом ``total_fields.hdf5`` и предлагает открыть его."""
-        self._set_info(f"Рендер полей готов:\n{path}")
+        self._set_info(f"Render fields done:\n{path}")
         node = self.selected_run_node
         if node is not None and self.tree.exists(node):
             self._add_results_node(node, path)
         if messagebox.askyesno(
-            "Рендер полей",
-            f"Готово:\n{path}\n\nОткрыть во viewer?",
+            "Render fields",
+            f"Done:\n{path}\n\nOpen in viewer?",
             parent=self.root,
         ):
             self._open_viewer(path)
@@ -760,7 +760,7 @@ class W2DNavigatorApp:
         artifacts = self.nav.run_artifacts(run_id)
         tasks = self.nav.tasks(run_id)
 
-        lines = [f"Прогон : {run_id}", f"Путь   : {run_dir}"]
+        lines = [f"Run    : {run_id}", f"Path   : {run_dir}"]
 
         report: dict[str, dict] = {}
         version = None
@@ -775,10 +775,10 @@ class W2DNavigatorApp:
                     if prov is not None:
                         report = self._shallow_attrs(reader, prov)
             except Exception as e:  # noqa: BLE001
-                lines.append(f"(не удалось прочитать {artifacts[0].name}: {e})")
+                lines.append(f"(failed to read {artifacts[0].name}: {e})")
 
         if version is not None:
-            lines.append(f"Формат : {self._text(version)}")
+            lines.append(f"Format : {self._text(version)}")
 
         if artifacts:
             parts: list[str] = []
@@ -787,11 +787,11 @@ class W2DNavigatorApp:
                     parts.append(f"{p.name} ({p.stat().st_size / 1e6:.2f} MB)")
                 except OSError:
                     parts.append(p.name)
-            lines.append("Файл   : " + ", ".join(parts))
+            lines.append("File   : " + ", ".join(parts))
         else:
-            lines.append("Файл   : нет run-level файла")
+            lines.append("File   : no run-level file")
 
-        lines.append(f"Задачи : {self._task_summary(tasks)}")
+        lines.append(f"Tasks  : {self._task_summary(tasks)}")
 
         # Статусы задач: ключи ``/report/<task>`` со своим атрибутом status.
         task_set = set(tasks)
@@ -802,11 +802,11 @@ class W2DNavigatorApp:
         ]
         if statuses:
             ok = sum(1 for s in statuses if self._text(s) == "SUCCESS")
-            lines.append(f"Статус : {ok}/{len(statuses)} SUCCESS")
+            lines.append(f"Status : {ok}/{len(statuses)} SUCCESS")
 
         wall = report.get(REPORT, {}).get("wall_time_sec")
         if wall is not None:
-            lines.append(f"Время  : wall {float(wall):.2f} s")
+            lines.append(f"Time   : wall {float(wall):.2f} s")
 
         # Сборка: 0.96 — /report/build, 0.94 — /manifest/toolchain.
         build = report.get("build") or report.get("toolchain") or {}
@@ -820,17 +820,17 @@ class W2DNavigatorApp:
             )
             hdf5 = build.get("hdf5") or build.get("hdf5_ver")
             suffix = f", hdf5 {self._text(hdf5)}" if hdf5 is not None else ""
-            lines.append(f"Сборка : {branch}@{commit} ({compiler}{suffix})")
+            lines.append(f"Build  : {branch}@{commit} ({compiler}{suffix})")
 
         system = report.get("system_info") or report.get("system") or {}
         if system:
             host = self._text(system.get("host") or system.get("hostname") or "?")
             sysname = self._text(system.get("system", "?"))
-            lines.append(f"Система: {host} — {sysname}")
+            lines.append(f"System : {host} — {sysname}")
 
         try:
             names = ", ".join(sorted(p.name for p in run_dir.iterdir()))
-            lines.append(f"Содержит: {names}")
+            lines.append(f"Contains: {names}")
         except OSError:
             pass
 
@@ -859,7 +859,7 @@ class W2DNavigatorApp:
     def _task_summary(self, tasks: list[str]) -> str:
         """Краткое описание задач: ``5 (nphi -122…+122)`` или просто число."""
         if not tasks:
-            return "нет"
+            return "none"
         rng = self._axis_range(tasks)
         return f"{len(tasks)} ({rng})" if rng else str(len(tasks))
 
@@ -892,10 +892,10 @@ class W2DNavigatorApp:
 
     def _show_file_info(self, path: Path) -> None:
         if not fsprobe.is_file(path):
-            self._set_info(f"Файл недоступен:\n{path}")
+            self._set_info(f"File unavailable:\n{path}")
             return
         size_mb = path.stat().st_size / 1e6
-        lines = [f"Файл  : {path}", f"Размер: {size_mb:.2f} MB", ""]
+        lines = [f"File : {path}", f"Size : {size_mb:.2f} MB", ""]
         try:
             with H5Reader(path) as reader:
                 # Провенанс: в 0.95+ группа /report, в 0.94 — /manifest.
@@ -913,7 +913,7 @@ class W2DNavigatorApp:
                     lines.append("input:")
                     lines.extend(self._format_params(reader.params(), "/input"))
         except Exception as e:  # noqa: BLE001
-            lines.append(f"(не удалось прочитать параметры: {e})")
+            lines.append(f"(failed to read parameters: {e})")
         self._set_info("\n".join(lines))
 
     @staticmethod

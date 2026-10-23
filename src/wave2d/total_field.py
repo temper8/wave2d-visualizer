@@ -102,13 +102,13 @@ def ensure_merged(path: str | Path) -> Path:
     """
     path = Path(path)
     if not path.is_file():
-        raise ValueError(f"Нет merged-файла: {path}")
+        raise ValueError(f"No merged file: {path}")
     with _open_read(path) as fh:
         layout = _decode(fh.attrs.get(MERGED_LAYOUT))
     if layout != MERGED_LAYOUT_NPHI_AXIS:
         raise ValueError(
-            f"'{path}': раскладка {layout!r} не поддерживается "
-            f"(ожидается {MERGED_LAYOUT_NPHI_AXIS!r})"
+            f"'{path}': layout {layout!r} is not supported "
+            f"(expected {MERGED_LAYOUT_NPHI_AXIS!r})"
         )
     return path
 
@@ -116,7 +116,7 @@ def ensure_merged(path: str | Path) -> Path:
 def _read_spectrum(fh: h5py.File, path: Path) -> tuple[np.ndarray, np.ndarray, dict]:
     """Читает ``/spectrum``: ``(n, An, attrs)``."""
     if SPECTRUM not in fh:
-        raise ValueError(f"'{path}': нет группы {SPECTRUM}")
+        raise ValueError(f"'{path}': missing group {SPECTRUM}")
     group = fh[SPECTRUM]
     n = np.asarray(group["n"][...], dtype=int)
     an = np.asarray(group["An"][...], dtype=complex)
@@ -144,35 +144,35 @@ def total_field_pol_xs(
     path = ensure_merged(merged_path)
     phi_rad = np.deg2rad(np.asarray(list(phi_deg), dtype=float).ravel())
     if phi_rad.size == 0:
-        raise ValueError("Пустой набор углов phi")
+        raise ValueError("Empty set of phi angles")
     n_phi = phi_rad.size
 
     with _open_read(path) as fh:
         fmt = _decode(fh.attrs.get(FORMAT_VERSION_ATTR))
         if fmt not in SUPPORTED_FORMAT:
-            report(f"предупреждение: format_version={fmt!r} не из {SUPPORTED_FORMAT}")
+            report(f"warning: format_version={fmt!r} not in {SUPPORTED_FORMAT}")
         n, an, attrs = _read_spectrum(fh, path)
 
         ant_type = int(attrs.get("ant_type", -1))
         if ant_type not in (ANT_GRILL, ANT_GAUSS_BEAM):
-            report(f"предупреждение: ant_type={ant_type} — ни grill, ни gbeam")
+            report(f"warning: ant_type={ant_type} — neither grill nor gbeam")
 
         if NPHI not in fh:
-            raise ValueError(f"'{path}': нет оси {NPHI}")
+            raise ValueError(f"'{path}': missing axis {NPHI}")
         axis = np.asarray(fh[NPHI][...], dtype=int)
 
         fields = fh[FIELDS]
         first = fields[COMPONENTS[0]]
         if first.ndim != 3:
             raise ValueError(
-                f"'{path}': {FIELDS}/{COMPONENTS[0]} имеет размерность "
-                f"{first.ndim}, ожидалась 3 (Nr, Ntheta, Nnphi)"
+                f"'{path}': {FIELDS}/{COMPONENTS[0]} has rank "
+                f"{first.ndim}, expected 3 (Nr, Ntheta, Nnphi)"
             )
         nr, ntheta, n_modes = first.shape
         if len(axis) != n_modes:
             raise ValueError(
-                f"'{path}': ось {NPHI} длины {len(axis)} не совпадает с числом "
-                f"мод {n_modes} в {FIELDS}"
+                f"'{path}': axis {NPHI} length {len(axis)} does not match "
+                f"mode count {n_modes} in {FIELDS}"
             )
 
         weights = {int(k): complex(v) for k, v in zip(n, an)}
@@ -197,17 +197,17 @@ def total_field_pol_xs(
                 slice_ = np.asarray(fields[name][..., index])
                 acc[name] += slice_[..., None] * phase
             used.append(mode)
-            report(f"мода {mode} [{len(used)}/{n_modes}]")
+            report(f"mode {mode} [{len(used)}/{n_modes}]")
 
         if wanted is not None:
             missing = sorted(wanted - set(int(m) for m in axis))
         if skipped:
-            report(f"предупреждение: нет An для мод {skipped} — пропущены")
+            report(f"warning: no An for modes {skipped} — skipped")
 
     if not used:
-        raise RuntimeError("Не найдено ни одной пригодной моды для суммирования")
+        raise RuntimeError("No suitable modes found for summation")
     if missing:
-        report(f"предупреждение: мод нет в серии: {missing}")
+        report(f"warning: modes not in series: {missing}")
 
     ex, ey, ez = (acc[name] for name in COMPONENTS)
     ea = np.sqrt(np.abs(ex) ** 2 + np.abs(ey) ** 2 + np.abs(ez) ** 2)

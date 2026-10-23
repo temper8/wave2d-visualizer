@@ -270,11 +270,11 @@ class MultiViewWindow(tk.Toplevel):
                 frame,
                 justify="center",
                 text=(
-                    "Нет добавленных графиков.\n\n"
-                    "Нажмите «В сравнение» в окне просмотра."
+                    "No plots added yet.\n\n"
+                    "Click \"Add to comparison\" in the viewer window."
                 ),
             ).pack(expand=True)
-            self._notebook.add(frame, text="(пусто)")
+            self._notebook.add(frame, text="(empty)")
             return
 
         for name in groups:
@@ -329,7 +329,7 @@ class MultiViewWindow(tk.Toplevel):
             for item in items
         ]
         draw_curves(
-            ax, series, title=f"{name} — сравнение", xlabel="index", ylabel=name
+            ax, series, title=f"{name} — comparison", xlabel="index", ylabel=name
         )
         canvas.draw()
 
@@ -342,7 +342,7 @@ class MultiViewWindow(tk.Toplevel):
         """Вкладка прочих групп: заголовок, список элементов, удаление."""
         frame = ttk.Frame(self._notebook)
         ttk.Label(
-            frame, text=f"Датасет: {name}   (элементов: {len(items)})"
+            frame, text=f"Dataset: {name}   (items: {len(items)})"
         ).pack(anchor="w", padx=6, pady=(6, 2))
 
         body = ttk.Frame(frame)
@@ -377,12 +377,12 @@ class MultiViewWindow(tk.Toplevel):
         actions.pack(side=tk.RIGHT, padx=(6, 0))
         ttk.Button(
             actions,
-            text="Удалить выбранное",
+            text="Remove selected",
             command=lambda: self._remove_selected(listbox, items),
         ).pack(fill=tk.X)
         ttk.Button(
             actions,
-            text="Очистить все",
+            text="Clear all",
             command=self.comparison.clear,
         ).pack(fill=tk.X, pady=(4, 0))
 

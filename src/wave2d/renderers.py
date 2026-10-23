@@ -113,7 +113,7 @@ def draw_toroidal_view(
     ax.set_xlim(-limit, limit)
     ax.set_ylim(-limit, limit)
     ax.set_axis_off()
-    ax.set_title(f"{title} (топ-вид)" if title else "топ-вид", fontsize=8)
+    ax.set_title(f"{title} (top view)" if title else "top view", fontsize=8)
     ax.text(
         0.5, -0.04, f"phi = {np.rad2deg(phi_rad):.1f}°",
         transform=ax.transAxes, ha="center", va="top", fontsize=9,
@@ -213,7 +213,7 @@ def draw_equatorial_view(
     ax.set_ylim(-limit, limit)
     ax.set_axis_off()
     ax.set_title(
-        f"{title} (экватор Z=0)" if title else "экватор Z=0", fontsize=8
+        f"{title} (equator Z=0)" if title else "equator Z=0", fontsize=8
     )
     if 0 <= current < len(phi):
         ax.text(

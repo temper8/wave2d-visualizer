@@ -75,7 +75,7 @@ class W2DViewer:
         # чтобы корневой узел в дереве был не нужен.
         version = format_version_of(self.reader)
         version_text = f"{version[0]}.{version[1]:02d}" if version else "?"
-        self.root.title(f"W2D Viewer — {file_path} (формат {version_text})")
+        self.root.title(f"W2D Viewer — {file_path} (format {version_text})")
         self.root.geometry("1150x780")
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
@@ -230,9 +230,9 @@ class W2DViewer:
         )
         if add_to_comparison(item) is AddResult.CONFLICT:
             messagebox.showwarning(
-                "Сравнение",
-                "В этой группе уже есть датасеты другой размерности "
-                "(1D и 2D вместе не сравниваются).",
+                "Comparison",
+                "This group already has datasets of a different dimension "
+                "(1D and 2D cannot be compared together).",
                 parent=self.root,
             )
 

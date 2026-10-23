@@ -162,14 +162,14 @@ def merge_nphi_tasks(
     tasks = nphi_tasks(run_id)
     if len(tasks) < 2:
         raise ValueError(
-            f"Для слияния нужно минимум 2 задачи-моды nphi, найдено {len(tasks)}"
+            f"Merging needs at least 2 nphi mode tasks, found {len(tasks)}"
             f" ({run_id})"
         )
 
     versions = {_format_version(path) for _, _, path in tasks}
     if len(versions) > 1:
         raise ValueError(
-            f"Разные версии схемы в задачах: {sorted(str(v) for v in versions)}"
+            f"Mixed schema versions across tasks: {sorted(str(v) for v in versions)}"
         )
 
     out_path = Path(out_path) if out_path is not None else merged_results(run_id)
@@ -179,8 +179,8 @@ def merge_nphi_tasks(
     n_modes = len(tasks)
     base_nphi, base_task, base_path = tasks[0]
     report(
-        f"База: {base_task} (nphi={base_nphi}), схема {next(iter(versions)) or '?'}, "
-        f"мод: {n_modes}"
+        f"Base: {base_task} (nphi={base_nphi}), schema {next(iter(versions)) or '?'}, "
+        f"modes: {n_modes}"
     )
 
     with h5py.File(out_path, "w") as out:
@@ -195,7 +195,7 @@ def merge_nphi_tasks(
         out.attrs[MERGED_LAYOUT] = MERGED_LAYOUT_NPHI_AXIS
         out.attrs["merged_from"] = run_id
         out.attrs["merged_modes"] = n_modes
-        report("Скопированы общие группы (input/grid/geometry/plasma/flux_surf)")
+        report("Copied shared groups (input/grid/geometry/plasma/flux_surf)")
 
         # Ось мод: координата + жёсткие ссылки в каждой стековой группе.
         axis = out.create_dataset(NPHI, data=np.asarray(modes, dtype=np.int32))
@@ -207,7 +207,7 @@ def merge_nphi_tasks(
 
         _write_series_range(out, modes)
 
-    report(f"Готово: {out_path}")
+    report(f"Done: {out_path}")
     return out_path
 
 

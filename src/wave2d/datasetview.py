@@ -304,7 +304,7 @@ class DatasetView(ttk.Frame):
         """
         selections = self._selections
         if not selections:
-            return "message", "Выберите узел в дереве"
+            return "message", "Select a node in the tree"
         if all(s.data is not None and s.data.ndim == 1 for s in selections):
             return "1d", ""
         first = selections[0]
@@ -387,7 +387,7 @@ class DatasetView(ttk.Frame):
             self.axis_var.set("index")
         frame = ttk.Frame(self.controls)
         frame.pack(side=tk.LEFT)
-        ttk.Label(frame, text="ось:").pack(side=tk.LEFT)
+        ttk.Label(frame, text="axis:").pack(side=tk.LEFT)
         for name in names:
             ttk.Radiobutton(
                 frame, text=name, variable=self.axis_var, value=name,
@@ -400,7 +400,7 @@ class DatasetView(ttk.Frame):
             return
         ttk.Button(
             self.controls,
-            text="В сравнение",
+            text="Add to comparison",
             command=self._emit_add_to_comparison,
         ).pack(side=tk.RIGHT)
 
@@ -442,7 +442,7 @@ class DatasetView(ttk.Frame):
         frame.pack(side=tk.LEFT, padx=(0, 20))
         ttk.Label(
             frame,
-            text="угол:" if selection.mode_name == "phi" else "мода:",
+            text="angle:" if selection.mode_name == "phi" else "mode:",
         ).pack(side=tk.LEFT)
         tk.Scale(
             frame, from_=0, to=count - 1, orient=tk.HORIZONTAL, showvalue=False,
@@ -462,13 +462,13 @@ class DatasetView(ttk.Frame):
         """
         ttk.Checkbutton(
             self.controls,
-            text="Экватор (Z=0)",
+            text="Equator (Z=0)",
             variable=self.toroidal_var,
             command=self.redraw,
         ).pack(side=tk.LEFT, padx=(0, 20))
         ttk.Checkbutton(
             self.controls,
-            text="Заливка",
+            text="Fill",
             variable=self.fill_var,
             command=self.redraw,
         ).pack(side=tk.LEFT, padx=(0, 20))
@@ -681,7 +681,7 @@ class DatasetView(ttk.Frame):
 
     @staticmethod
     def _attrs_text(attrs: dict[str, Any]) -> str:
-        lines = [f"{k} = {v}" for k, v in attrs.items()] or ["(атрибутов нет)"]
+        lines = [f"{k} = {v}" for k, v in attrs.items()] or ["(no attributes)"]
         return "\n".join(lines)
 
     def _set_attr_text(self, text: str) -> None:
