@@ -49,7 +49,7 @@ Python-комплекс для конвертации, 2D-визуализаци
 uv run elmfire_convert.py     # ELMFIRE *.dat -> z1.h5
 uv run w2d_render.py          # 2D-графики полей из results.h5 (или первой задачи)
 uv run w2d_viewer.py          # GUI: дерево HDF5 (results.h5/report.h5) + поле
-uv run w2d_app.py             # GUI: выбор прогона Wave2D -> открыть w2d_viewer
+uv run w2d_app.py             # GUI: выбор прогона -> viewer, слияние nphi, рендер полей
 uv run elmfire_viewer.py      # GUI просмотра флуктуаций
 uv run tools/integrator.py    # интеграл перекрытия
 uv run w2d_total_field.py     # сумма полей по спектру nphi (merged) -> total_fields.hdf5

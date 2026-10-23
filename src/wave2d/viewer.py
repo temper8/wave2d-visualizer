@@ -32,6 +32,8 @@ from src.wave2d.schema import (
     MERGED_LAYOUT,
     MERGED_LAYOUT_NPHI_AXIS,
     NPHI,
+    STACK_COORD,
+    STACK_NAME,
     format_version_of,
     open_results,
 )
@@ -150,7 +152,7 @@ class W2DViewer:
         """
         kind = self.reader.kind(path)
         data = None if kind == "group" else self._array(path)
-        mode_axis, mode_values = self._mode_axis(path, data)
+        mode_axis, mode_values, mode_name = self._mode_axis(path, data)
         return Selection(
             path=path,
             kind=kind,
@@ -158,28 +160,40 @@ class W2DViewer:
             data=data,
             mode_axis=mode_axis,
             mode_values=mode_values,
+            mode_name=mode_name,
         )
 
     def _mode_axis(
         self, path: str, data: np.ndarray | None
-    ) -> tuple[int | None, np.ndarray | None]:
-        """Ось мод ``(номер, координата)`` для датасета объединённого файла.
+    ) -> tuple[int | None, np.ndarray | None, str | None]:
+        """Ось стека ``(номер, координата, имя)`` для датасета с 3-й осью.
 
-        Ось — последняя, если файл помечен раскладкой ``nphi-axis``, датасет
-        лежит в одной из стековых групп и его последняя размерность совпадает
-        с длиной ``/nphi``. Иначе — ``(None, None)``.
+        Ось — последняя. Координата берётся из корневого ``stack_coord``
+        (напр. ``/phi`` у ``total_fields.hdf5``). Для merged-файла без этого
+        атрибута — обратная совместимость: ``/nphi``, если раскладка
+        ``nphi-axis`` и датасет лежит в стековой группе. Иначе —
+        ``(None, None, None)``.
         """
         if data is None or data.ndim < 2:
-            return None, None
-        if self.reader.attrs("/").get(MERGED_LAYOUT) != MERGED_LAYOUT_NPHI_AXIS:
-            return None, None
-        group = "/" + path.strip("/").split("/", 1)[0]
-        if group not in MERGED_GROUPS:
-            return None, None
-        values = self._array(NPHI)
+            return None, None, None
+        root = self.reader.attrs("/")
+        coord = root.get(STACK_COORD)
+        name = root.get(STACK_NAME)
+        if coord is None:
+            if root.get(MERGED_LAYOUT) != MERGED_LAYOUT_NPHI_AXIS:
+                return None, None, None
+            group = "/" + path.strip("/").split("/", 1)[0]
+            if group not in MERGED_GROUPS:
+                return None, None, None
+            coord, name = NPHI, "nphi"
+        if isinstance(coord, bytes):
+            coord = coord.decode("utf-8", "replace")
+        if isinstance(name, bytes):
+            name = name.decode("utf-8", "replace")
+        values = self._array(coord)
         if values is None or data.shape[-1] != len(values):
-            return None, None
-        return data.ndim - 1, values
+            return None, None, None
+        return data.ndim - 1, values, (None if name is None else str(name))
 
     def _attrs(self, path: str) -> dict:
         """Атрибуты узла; ошибка чтения — пустой словарь (не роняем окно)."""

@@ -13,6 +13,11 @@
 ``derived/runs/<case>/<stamp>/nphi_merged.h5``
 (:mod:`src.wave2d.merge`); готовый файл появляется в дереве листом.
 
+Кнопка **«Рендер полей»** (активна при наличии merged-файла) суммирует поля
+мод по тороидальному спектру ``nphi`` (:mod:`src.wave2d.total_field`) при
+заданном числе точек по углу ``phi`` и пишет ``total_fields.hdf5`` рядом с
+merged-файлом; готовый файл открывается во viewer.
+
 Кнопка **«Открыть»** в шапке позволяет выбрать другую папку Wave2D; выбранный
 путь запоминается между запусками через :mod:`src.common.settings`.
 При наличии WSL рядом добавляются кнопки с именами дистрибутивов
@@ -27,12 +32,12 @@ from pathlib import Path
 import queue
 import threading
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from src.common import fsprobe
 from src.common.h5reader import H5Reader
 from src.common.navigator import Wave2DNavigator, data_root
-from src.common.paths import merged_results
+from src.common.paths import merged_results, run_derived
 from src.common.settings import (
     get_navigator_history,
     get_navigator_root,
@@ -41,6 +46,7 @@ from src.common.settings import (
 )
 from src.common.wsl import wsl_roots
 from src.wave2d.merge import merge_nphi_tasks, nphi_tasks
+from src.wave2d.total_field import total_field_pol_xs, write_total_fields
 from src.wave2d.schema import (
     MANIFEST,
     REPORT,
@@ -54,7 +60,8 @@ from src.wave2d.viewer import W2DViewer
 _ICON_PATH = Path(__file__).resolve().parent / "assets" / "w2d_app_icon.png"
 
 # Кнопки-заглушки панели действий с прогоном (команды появятся позже).
-RUN_ACTIONS = ("Рендер полей", "Спектр", "Открыть папку")
+# «Рендер полей» реализована отдельно — см. :meth:`W2DNavigatorApp.render_fields`.
+RUN_ACTIONS = ("Спектр", "Открыть папку")
 
 class W2DNavigatorApp:
     """Окно выбора прогона Wave2D и запуска просмотрщика."""
@@ -75,6 +82,9 @@ class W2DNavigatorApp:
         self._merge_busy = False
         self._merge_log: list[str] = []
         self._merge_queue: queue.Queue | None = None
+        self._render_busy = False
+        self._render_log: list[str] = []
+        self._render_queue: queue.Queue | None = None
 
         # Проверяем доступность папки до построения навигатора: обращение
         # к мёртвой сетевой шаре иначе виснет на SMB-таймаут ещё до отрисовки.
@@ -264,6 +274,11 @@ class W2DNavigatorApp:
             state="disabled",
         )
         self.merge_btn.pack(side=tk.LEFT, padx=(6, 4), pady=6)
+        self.render_btn = ttk.Button(
+            self.actions, text="Рендер полей", command=self.render_fields,
+            state="disabled",
+        )
+        self.render_btn.pack(side=tk.LEFT, padx=(6, 4), pady=6)
         for text in RUN_ACTIONS:
             btn = ttk.Button(self.actions, text=text, state="disabled")
             btn.pack(side=tk.LEFT, padx=(6, 4), pady=6)
@@ -385,10 +400,13 @@ class W2DNavigatorApp:
             self._add_results_node(parent, path)
 
     def _add_derived_node(self, parent: str, run_id: str) -> None:
-        """Добавляет производные артефакты прогона (напр. ``nphi_merged.h5``)."""
-        merged = merged_results(run_id)
-        if merged.is_file():
-            self._add_results_node(parent, merged)
+        """Добавляет производные артефакты прогона (merged и total_fields)."""
+        for path in (
+            merged_results(run_id),
+            run_derived(run_id, "total_fields.hdf5"),
+        ):
+            if path.is_file():
+                self._add_results_node(parent, path)
 
     def _add_results_node(self, parent: str, path: Path) -> None:
         if not path.is_file():
@@ -470,13 +488,20 @@ class W2DNavigatorApp:
         """
         run_id = self.selected_run
         self._set_run_buttons(run_id is not None)
+        busy = self._merge_busy or self._render_busy
         can_merge = False
-        if run_id is not None and not self._merge_busy:
+        if run_id is not None and not busy:
             try:
                 can_merge = len(nphi_tasks(run_id)) >= 2
             except OSError:
                 can_merge = False
         self.merge_btn.configure(state="normal" if can_merge else "disabled")
+        can_render = (
+            run_id is not None
+            and not busy
+            and fsprobe.is_file(merged_results(run_id))
+        )
+        self.render_btn.configure(state="normal" if can_render else "disabled")
 
     # --- слияние по nphi -------------------------------------------------
 
@@ -546,6 +571,100 @@ class W2DNavigatorApp:
             self._add_results_node(node, path)
         if messagebox.askyesno(
             "Слияние nphi",
+            f"Готово:\n{path}\n\nОткрыть во viewer?",
+            parent=self.root,
+        ):
+            self._open_viewer(path)
+
+    # --- рендер полей (сумма по спектру nphi) ---------------------------
+
+    def render_fields(self) -> None:
+        """Суммирует поля мод merged-файла по спектру ``nphi``.
+
+        Число точек по углу ``phi`` спрашивается у пользователя (по умолчанию
+        4, равномерно по ``[0, 360°)``). Результат — ``total_fields.hdf5`` рядом
+        с merged-файлом; по завершении предлагается открыть его во viewer.
+        """
+        run_id = self.selected_run
+        if run_id is None or self._render_busy:
+            return
+        merged = merged_results(run_id)
+        if not fsprobe.is_file(merged):
+            messagebox.showinfo(
+                "Рендер полей",
+                f"Нет объединённого файла:\n{merged}\n\n"
+                "Сначала выполните «Слияние (nphi)».",
+                parent=self.root,
+            )
+            return
+        samples = simpledialog.askinteger(
+            "Рендер полей",
+            "Число точек по углу phi (равномерно по [0, 360°)):",
+            parent=self.root, initialvalue=4, minvalue=1, maxvalue=1000,
+        )
+        if samples is None:
+            return
+        phi = [0.0] if samples == 1 else [360.0 * i / samples for i in range(samples)]
+        out = run_derived(run_id, "total_fields.hdf5")
+
+        self._render_busy = True
+        self._render_log = []
+        self._render_queue = queue.Queue()
+        self._refresh_run_actions()
+        self._set_info(
+            f"Рендер полей: {run_id}\n"
+            f"Источник: {merged}\n"
+            f"phi: {samples} точек\nФайл: {out}\n\nИдёт расчёт…"
+        )
+
+        queue_ = self._render_queue
+
+        def worker() -> None:
+            try:
+                result = total_field_pol_xs(merged, phi, progress=queue_.put)
+                write_total_fields(out, result, merged)
+                queue_.put(("done", out))
+            except Exception as e:  # noqa: BLE001
+                queue_.put(("error", str(e)))
+
+        threading.Thread(target=worker, daemon=True).start()
+        self.root.after(150, self._poll_render)
+
+    def _poll_render(self) -> None:
+        """Опросом очереди обновляет панель, пока идёт рендер полей."""
+        finished: tuple[str, object] | None = None
+        while self._render_queue is not None:
+            try:
+                item = self._render_queue.get_nowait()
+            except queue.Empty:
+                break
+            if isinstance(item, tuple):
+                finished = item
+            else:
+                self._render_log.append(str(item))
+                self._set_info("Рендер полей:\n" + "\n".join(self._render_log))
+
+        if finished is None:
+            self.root.after(150, self._poll_render)
+            return
+
+        kind, payload = finished
+        self._render_busy = False
+        self._refresh_run_actions()
+        if kind == "done":
+            self._show_total_fields(Path(payload))
+        else:
+            self._set_info(f"Рендер полей: ошибка\n{payload}")
+            messagebox.showerror("Рендер полей", str(payload), parent=self.root)
+
+    def _show_total_fields(self, path: Path) -> None:
+        """Сообщает о готовом ``total_fields.hdf5`` и предлагает открыть его."""
+        self._set_info(f"Рендер полей готов:\n{path}")
+        node = self.selected_run_node
+        if node is not None and self.tree.exists(node):
+            self._add_results_node(node, path)
+        if messagebox.askyesno(
+            "Рендер полей",
             f"Готово:\n{path}\n\nОткрыть во viewer?",
             parent=self.root,
         ):

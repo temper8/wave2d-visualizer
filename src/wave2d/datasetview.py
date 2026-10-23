@@ -4,8 +4,9 @@
 
 - **2D** — изображение датасета: ``(R,Z)`` (если есть координаты) или
   ``(rho,theta)``, с выбором составляющей ``real``/``imag``/``abs`` и colorbar;
-- **3D-стек** — срез объединённого по ``nphi`` файла (последняя ось — моды):
-  слайдер моды + та же отрисовка, что для 2D (поле) или 1D (профиль);
+- **3D-стек** — срез файла с осью стека последней (моды ``nphi`` у merged или
+  угол ``phi`` у ``total_fields.hdf5``): слайдер оси + та же отрисовка, что для
+  2D (поле) или 1D (профиль);
 - **1D** — одна или **несколько** линий против общей оси
   ``index``/``rho``/``psi`` (``rho``/``psi`` — если переданы и совпадают по
   длине у всех рядов) с подписями из атрибута ``units`` и легендой;
@@ -63,10 +64,12 @@ class Selection:
     kind: str | None = None
     attrs: dict[str, Any] = field(default_factory=dict)
     data: np.ndarray | None = None
-    #: Ось мод (номер) в объединённом файле — последняя ось ``nphi``.
+    #: Номер оси стека (последняя ось) в объединённом/производном файле.
     mode_axis: int | None = None
-    #: Координаты мод (``/nphi``) для подписи слайдера.
+    #: Координаты оси стека (``/nphi``/``/phi``) для подписи слайдера.
     mode_values: np.ndarray | None = None
+    #: Имя оси стека (``"nphi"``/``"phi"``) для подписи слайдера.
+    mode_name: str | None = None
 
 
 class DatasetView(ttk.Frame):
@@ -395,7 +398,7 @@ class DatasetView(ttk.Frame):
                 self._add_comp_buttons()
 
     def _add_mode_scale(self, selection: Selection) -> None:
-        """Горизонтальный слайдер индекса моды (последняя ось ``nphi``)."""
+        """Горизонтальный слайдер индекса среза по оси стека (последняя ось)."""
         axis = selection.mode_axis
         count = 0 if selection.data is None or axis is None else int(selection.data.shape[axis])
         if count <= 0:
@@ -424,14 +427,17 @@ class DatasetView(ttk.Frame):
         return data.take(index, axis=axis)
 
     def _mode_value(self, selection: Selection) -> str:
-        """Подпись текущей моды: ``nphi=<значение>`` или ``#<индекс>``."""
+        """Подпись среза: ``nphi=<значение>``, ``phi=<град>°`` или ``#<индекс>``."""
         index = int(self.mode_var.get())
         values = selection.mode_values
         if values is None:
             return f"#{index}"
-        if 0 <= index < len(values):
-            return f"nphi={int(values[index])}"
-        return ""
+        if not 0 <= index < len(values):
+            return ""
+        name = selection.mode_name or "nphi"
+        if name == "phi":
+            return f"phi={np.rad2deg(float(values[index])):.1f}°"
+        return f"{name}={int(values[index])}"
 
     def _draw_stacked(self) -> None:
         """Рисует срез стека по моде: 2D-карту поля или 1D-профиль."""

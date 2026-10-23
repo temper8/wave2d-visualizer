@@ -39,7 +39,10 @@ from src.wave2d.schema import (
     MERGED_LAYOUT,
     MERGED_LAYOUT_NPHI_AXIS,
     NPHI,
+    PHI,
     SPECTRUM,
+    STACK_COORD,
+    STACK_NAME,
 )
 
 #: Поддерживаемые версии схемы (как в viewer-контракте).
@@ -229,6 +232,9 @@ def write_total_fields(
     Раскладка: ``/fields/{Ex,Ey,Ez,Ea}`` — ``(Nr, Ntheta, Nphi)``; ``/phi`` —
     ось угла (радианы); ``/nphi`` — использованные моды; ``/spectrum`` и
     ``/grid`` копируются из merged для трассируемости и отрисовки.
+
+    Ось стека помечена корневыми атрибутами ``stack_coord``/``stack_name``
+    (``"/phi"``/``"phi"``) — viewer рисует по ней слайдер.
     """
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -239,7 +245,8 @@ def write_total_fields(
         if fmt is not None:
             out.attrs[FORMAT_VERSION_ATTR] = fmt
         out.attrs["source"] = merged_path.name
-        out.attrs[MERGED_LAYOUT] = MERGED_LAYOUT_NPHI_AXIS
+        out.attrs[STACK_COORD] = PHI
+        out.attrs[STACK_NAME] = "phi"
         out.attrs["phi_samples"] = int(result.phi_rad.size)
         if result.phi_rad.size:
             out.attrs["phi_min_deg"] = float(result.phi_deg[0])
@@ -252,7 +259,7 @@ def write_total_fields(
 
         axis = out.create_dataset(NPHI, data=result.modes)
         axis.attrs["units"] = "1"
-        phi = out.create_dataset("/phi", data=result.phi_rad)
+        phi = out.create_dataset(PHI, data=result.phi_rad)
         phi.attrs["units"] = "rad"
 
         group = out.create_group(FIELDS)

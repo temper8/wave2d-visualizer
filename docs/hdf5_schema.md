@@ -543,9 +543,11 @@ viewer'ом.
 | `/nphi` | `(Nused,)` | использованные моды `nphi` |
 | `/spectrum`, `/grid` | без изменений | копия из merged (трассируемость и отрисовка) |
 
-`Nang` — число точек по углу `phi`. Атрибуты: `source` (имя merged-файла),
+`Nang` — число точек по углу `phi`. Ось стека помечена корневыми атрибутами
+`stack_coord = "/phi"` и `stack_name = "phi"` (viewer рисует по ней слайдер).
+Прочие атрибуты: `source` (имя merged-файла),
 `phi_samples/phi_min_deg/phi_max_deg`, `modes_used/modes_available/mode_min/mode_max`,
-`merged_layout`, `format_version`. Формула и валидация —
+`format_version`. Формула и валидация —
 `docs/viewer-total-field-pol-xs.md`.
 
 ## Особенности
