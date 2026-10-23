@@ -528,6 +528,26 @@ Windows его не создаёт — там шаг пропускается). 
 `merged_modes`. Корневой `format_version` сохраняется, чтобы файл открывался
 viewer'ом.
 
+### Сумма полей по спектру `nphi` (производный артефакт)
+
+`w2d_total_field.py` суммирует поля мод merged-файла по тороидальному спектру
+(порт легаси-опции 7 `PrintTotalFieldPolXS`) и пишет
+`derived/runs/<case>/<stamp>/total_fields.hdf5`. Источник — **только** merged-файл
+(`merged_layout = "nphi-axis"`); результат — 3D по оси угла `phi`.
+
+| Группа | Форма | Примечание |
+|---|---|---|
+| `/fields/{Ex,Ey,Ez}` | `(Nr, Ntheta, Nang)` | комплексные, при каждом угле `phi` |
+| `/fields/Ea` | `(Nr, Ntheta, Nang)` | `sqrt(|Ex|²+|Ey|²+|Ez|²)` — модуль ПОСЛЕ суммы по модам |
+| `/phi` | `(Nang,)` | ось тороидального угла, радианы |
+| `/nphi` | `(Nused,)` | использованные моды `nphi` |
+| `/spectrum`, `/grid` | без изменений | копия из merged (трассируемость и отрисовка) |
+
+`Nang` — число точек по углу `phi`. Атрибуты: `source` (имя merged-файла),
+`phi_samples/phi_min_deg/phi_max_deg`, `modes_used/modes_available/mode_min/mode_max`,
+`merged_layout`, `format_version`. Формула и валидация —
+`docs/viewer-total-field-pol-xs.md`.
+
 ## Особенности
 
 - **Ось.** Строка `ir = 0` (магнитная ось) заполняется не для всех датасетов:

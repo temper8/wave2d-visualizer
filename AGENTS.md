@@ -52,6 +52,7 @@ uv run w2d_viewer.py          # GUI: дерево HDF5 (results.h5/report.h5) + 
 uv run w2d_app.py             # GUI: выбор прогона Wave2D -> открыть w2d_viewer
 uv run elmfire_viewer.py      # GUI просмотра флуктуаций
 uv run tools/integrator.py    # интеграл перекрытия
+uv run w2d_total_field.py     # сумма полей по спектру nphi (merged) -> total_fields.hdf5
 uv run elmfire_video.py       # derived/frames/*.png -> fluctuations_evolution.mp4
 ```
 
@@ -73,6 +74,7 @@ src/
 │   ├── viewer.py            # W2DViewer — окно просмотра results.h5
 │   ├── app.py               # W2DNavigatorApp — GUI-навигатор по прогонам
 │   ├── merge.py             # слияние задач по nphi (3D-стек) -> derived/runs/.../nphi_merged.h5
+│   ├── total_field.py       # сумма полей по спектру nphi -> total_fields.hdf5
 │   ├── schema.py            # константы и проверка версии схемы HDF5
 │   └── assets/
 │       ├── w2d_app_icon.png # иконка окна (генератор — tools/make_icon.py)
@@ -88,6 +90,7 @@ tools/integrator_test_pi.py  # проверка интеграла единич�
 tools/integrator.py          # пример интеграла перекрытия (отложено, см. TODO/p9-elmfire-overlap-integral-and-fluctuations-shelved.md)
 tools/make_icon.py           # генератор иконки w2d_app (варианты a/b/c)
 w2d_render.py                # 2D-визуализация полей Wave2D
+w2d_total_field.py           # сумма полей по спектру nphi (merged) -> total_fields.hdf5
 w2d_viewer.py                # точка входа GUI-просмотрщика (логика в src/wave2d/)
 w2d_app.py                   # точка входа GUI-навигатора (логика в src/wave2d/)
 elmfire_viewer.py            # точка входа GUI-просмотрщика флуктуаций (src/elmfire/)
@@ -121,7 +124,8 @@ data/
 │       └── converted/z1.h5   # результат elmfire_convert.py
 └── derived/
     ├── runs/<case_id>/<stamp>/   # производные артефакты прогона (viewer)
-    │   └── nphi_merged.h5        # 3D-стек задач по nphi (кнопка «Слияние»)
+    │   ├── nphi_merged.h5        # 3D-стек задач по nphi (кнопка «Слияние»)
+    │   └── total_fields.hdf5     # сумма полей по спектру nphi (w2d_total_field.py)
     ├── plots/{FT-2_LH_smoke,FT-2_LH_smoke_nphi,FT2}/   # карты полей (w2d_render.py)
     ├── frames/WagD/          # 945 PNG кадров флуктуаций
     ├── video/                # fluctuations_evolution.mp4
