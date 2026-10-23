@@ -167,6 +167,8 @@ class DatasetView(ttk.Frame):
         self.mode_var = tk.IntVar(value=0)
         #: Чекбокс «Тороидальный вид» (топ-вид тора рядом с полоидальной картой).
         self.toroidal_var = tk.BooleanVar(value=True)
+        #: Чекбокс «Заливка» (топ-вид экватора через ``pcolormesh`` вместо маркеров).
+        self.fill_var = tk.BooleanVar(value=False)
         self._mode_label: ttk.Label | None = None
 
         # Две панели: полоидальная карта (широкая) и топ-вид тора (узкая).
@@ -448,15 +450,23 @@ class DatasetView(ttk.Frame):
         self._mode_label.pack(side=tk.LEFT, padx=(6, 0))
 
     def _add_toroidal_toggle(self) -> None:
-        """Чекбокс «Тороидальный вид»: топ-вид тора с стрелкой на текущем ``phi``.
+        """Чекбоксы топ-вида: «Тороидальный вид» и «Заливка» экватора.
 
-        Доступен только датасетам с осью ``phi`` (``total_fields.hdf5``) —
-        то есть выставляется для каждой компоненты (``Ex``/``Ey``/``Ez``/``Ea``).
+        Доступны только датасетам с осью ``phi`` (``total_fields.hdf5``) —
+        то есть выставляются для каждой компоненты (``Ex``/``Ey``/``Ez``/``Ea``).
+        «Заливка» включает ``pcolormesh`` вместо ``scatter`` (интерполяция
+        между ``phi``); при одном угле она игнорируется.
         """
         ttk.Checkbutton(
             self.controls,
             text="Тороидальный вид",
             variable=self.toroidal_var,
+            command=self.redraw,
+        ).pack(side=tk.LEFT, padx=(0, 20))
+        ttk.Checkbutton(
+            self.controls,
+            text="Заливка",
+            variable=self.fill_var,
             command=self.redraw,
         ).pack(side=tk.LEFT, padx=(0, 20))
 
@@ -569,6 +579,7 @@ class DatasetView(ttk.Frame):
             values_in=values[keep_in, i_in, :],
             current=index,
             title=selection.path or "",
+            fill=self.fill_var.get(),
         )
         return True
 

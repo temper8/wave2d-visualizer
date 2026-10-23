@@ -132,6 +132,7 @@ def draw_equatorial_view(
     current: int = 0,
     title: str = "",
     cmap: str = "viridis",
+    fill: bool = False,
 ) -> Colorbar:
     """Экваториальное сечение ``Z=0`` в топ-виде тора (данные поля).
 
@@ -143,7 +144,10 @@ def draw_equatorial_view(
     стрелка-«часовая» на текущем ``phi`` (индекс ``current``); стрелка кончается
     на **внутренней** границе кольца, а от неё до внешней границы идёт тонкая
     яркая линия того же цвета и толщины (подсветка выбранного ``phi``-луча).
-    Возвращает colorbar сечения (его снимает вызывающий перед следующей отрисовкой).
+    ``fill=True`` — заливка через ``pcolormesh`` (интерполяция между ``phi``)
+    вместо маркеров ``scatter``; при ``phi.size < 2`` заливка невозможна и
+    берётся ``scatter``. Возвращает colorbar сечения (его снимает вызывающий
+    перед следующей отрисовкой).
     """
     phi = np.asarray(phi_rad, dtype=float)
     r = np.concatenate(
@@ -152,12 +156,24 @@ def draw_equatorial_view(
     values = np.concatenate(
         [np.asarray(values_out), np.asarray(values_in)], axis=0
     )
-    x = np.outer(r, np.cos(phi))
-    y = np.outer(r, np.sin(phi))
-    mesh = ax.scatter(
-        x.ravel(), y.ravel(), c=values.ravel(),
-        s=6, cmap=cmap, marker="s", linewidths=0,
-    )
+    if fill and phi.size >= 2:
+        # Заливка: полярная mesh-сетка (радиус × phi). Радиус сортируем, чтобы
+        # четырёхугольники не «складывались»; значение между phi интерполируется.
+        order = np.argsort(r)
+        rs = r[order]
+        mesh = ax.pcolormesh(
+            np.outer(rs, np.cos(phi)),
+            np.outer(rs, np.sin(phi)),
+            values[order],
+            shading="gouraud",
+            cmap=cmap,
+        )
+    else:
+        mesh = ax.scatter(
+            np.outer(r, np.cos(phi)).ravel(),
+            np.outer(r, np.sin(phi)).ravel(),
+            c=values.ravel(), s=6, cmap=cmap, marker="s", linewidths=0,
+        )
     r_max = float(r.max())
     r_min = float(r.min())
     for radius in (r_max, r_min):
