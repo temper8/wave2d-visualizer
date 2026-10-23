@@ -415,7 +415,7 @@ class DatasetView(ttk.Frame):
     # --- стек по модам (3D) ----------------------------------------------
 
     def _add_stacked_controls(self) -> None:
-        """Переключатели стека: слайдер моды, затем вид/ось/составляющая."""
+        """Переключатели стека: слайдер моды/угла, затем вид/ось/составляющая."""
         first = self._selections[0]
         self._add_mode_scale(first)
         if first.data is None:
@@ -440,7 +440,10 @@ class DatasetView(ttk.Frame):
             self.mode_var.set(0)
         frame = ttk.Frame(self.controls)
         frame.pack(side=tk.LEFT, padx=(0, 20))
-        ttk.Label(frame, text="мода:").pack(side=tk.LEFT)
+        ttk.Label(
+            frame,
+            text="угол:" if selection.mode_name == "phi" else "мода:",
+        ).pack(side=tk.LEFT)
         tk.Scale(
             frame, from_=0, to=count - 1, orient=tk.HORIZONTAL, showvalue=False,
             variable=self.mode_var, length=150,
