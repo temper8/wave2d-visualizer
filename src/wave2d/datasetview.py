@@ -6,7 +6,8 @@
   ``(rho,theta)``, с выбором составляющей ``real``/``imag``/``abs`` и colorbar;
 - **3D-стек** — срез файла с осью стека последней (моды ``nphi`` у merged или
   угол ``phi`` у ``total_fields.hdf5``): слайдер оси + та же отрисовка, что для
-  2D (поле) или 1D (профиль);
+  2D (поле) или 1D (профиль); для оси ``phi`` — чекбокс «Тороидальный вид»
+  (топ-вид тора со стрелкой на текущем ``phi``);
 - **1D** — одна или **несколько** линий против общей оси
   ``index``/``rho``/``psi`` (``rho``/``psi`` — если переданы и совпадают по
   длине у всех рядов) с подписями из атрибута ``units`` и легендой;
@@ -39,7 +40,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 import tkinter as tk
 from tkinter import ttk
 
-from src.wave2d.renderers import component, draw_2d, draw_curves
+from src.wave2d.renderers import component, draw_2d, draw_curves, draw_toroidal_view
 
 
 def _units_text(units: Any) -> str:
@@ -144,11 +145,18 @@ class DatasetView(ttk.Frame):
         self.comp_var = tk.StringVar(value="abs")
         self.axis_var = tk.StringVar(value="index")
         self.mode_var = tk.IntVar(value=0)
+        #: Чекбокс «Тороидальный вид» (топ-вид тора рядом с полоидальной картой).
+        self.toroidal_var = tk.BooleanVar(value=True)
         self._mode_label: ttk.Label | None = None
 
-        self.fig, self.ax = plt.subplots(
-            figsize=(6.5, 5.5), layout="constrained"
-        )
+        # Две панели: полоидальная карта (широкая) и топ-вид тора (узкая).
+        # Топ-вид скрыт, пока не запрошен чекбоксом; ``constrained`` layout
+        # игнорирует невидимые оси и отдаёт всю ширину карте.
+        self.fig = plt.figure(figsize=(6.5, 5.5), layout="constrained")
+        grid = self.fig.add_gridspec(1, 2, width_ratios=(3, 1))
+        self.ax = self.fig.add_subplot(grid[0, 0])
+        self.ax_tor = self.fig.add_subplot(grid[0, 1])
+        self.ax_tor.set_visible(False)
         # Больше воздуха по краям фигуры (w_pad/h_pad — в дюймах).
         self.fig.get_layout_engine().set(w_pad=0.12, h_pad=0.12)
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
@@ -227,6 +235,7 @@ class DatasetView(ttk.Frame):
                 pass
             self._colorbar = None
         self.ax.clear()
+        self._hide_toroidal()
 
         mode, message = self._mode()
         self._layout(expanded=(mode == "attrs"))
@@ -390,6 +399,8 @@ class DatasetView(ttk.Frame):
         if first.data is None:
             return
         if first.data.ndim - 1 == 2:
+            if first.mode_name == "phi":
+                self._add_toroidal_toggle()
             self._add_view_buttons()
             self._add_comp_buttons()
         else:
@@ -415,6 +426,19 @@ class DatasetView(ttk.Frame):
         ).pack(side=tk.LEFT)
         self._mode_label = ttk.Label(frame, text=self._mode_value(selection))
         self._mode_label.pack(side=tk.LEFT, padx=(6, 0))
+
+    def _add_toroidal_toggle(self) -> None:
+        """Чекбокс «Тороидальный вид»: топ-вид тора с стрелкой на текущем ``phi``.
+
+        Доступен только датасетам с осью ``phi`` (``total_fields.hdf5``) —
+        то есть выставляется для каждой компоненты (``Ex``/``Ey``/``Ez``/``Ea``).
+        """
+        ttk.Checkbutton(
+            self.controls,
+            text="Тороидальный вид",
+            variable=self.toroidal_var,
+            command=self.redraw,
+        ).pack(side=tk.LEFT, padx=(0, 20))
 
     def _slice(self, selection: Selection) -> np.ndarray:
         """Срез по текущему индексу моды (уменьшает размерность на 1)."""
@@ -468,6 +492,30 @@ class DatasetView(ttk.Frame):
                 view=self.view_var.get(), R=self.R, Z=self.Z,
                 comp=self.comp_var.get(),
             )
+            self._draw_toroidal(selection)
+
+    def _draw_toroidal(self, selection: Selection) -> None:
+        """Топ-вид тора рядом с картой, если включён и есть ось ``phi``.
+
+        Схема (данные поля не участвуют): показывает, под каким тороидальным
+        углом взято текущее полоидальное сечение.
+        """
+        if selection.mode_name != "phi" or not self.toroidal_var.get():
+            return
+        values = selection.mode_values
+        if values is None or len(values) == 0:
+            return
+        index = min(max(int(self.mode_var.get()), 0), len(values) - 1)
+        self.ax_tor.set_visible(True)
+        self.ax_tor.clear()
+        draw_toroidal_view(
+            self.ax_tor, float(values[index]), title=selection.path or ""
+        )
+
+    def _hide_toroidal(self) -> None:
+        """Прячет и очищает топ-вид (его показывает только :meth:`_draw_stacked`)."""
+        self.ax_tor.clear()
+        self.ax_tor.set_visible(False)
 
     # --- 1D ---------------------------------------------------------------
 

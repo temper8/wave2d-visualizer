@@ -48,7 +48,7 @@ Python-комплекс для конвертации, 2D-визуализаци
 ```bash
 uv run elmfire_convert.py     # ELMFIRE *.dat -> z1.h5
 uv run w2d_render.py          # 2D-графики полей из results.h5 (или первой задачи)
-uv run w2d_viewer.py          # GUI: дерево HDF5 (results.h5/report.h5) + поле
+uv run w2d_viewer.py          # GUI: дерево HDF5 (results.h5/report.h5) + поле (+ топ-вид тора)
 uv run w2d_app.py             # GUI: выбор прогона -> viewer, слияние nphi, рендер полей
 uv run elmfire_viewer.py      # GUI просмотра флуктуаций
 uv run tools/integrator.py    # интеграл перекрытия

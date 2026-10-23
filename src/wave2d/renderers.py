@@ -18,6 +18,7 @@ import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.colorbar import Colorbar
 from matplotlib.figure import Figure
+from matplotlib.patches import Circle
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
@@ -67,6 +68,56 @@ def draw_2d(
     # держит шкалу вплотную к осям, где бы те ни оказались (size/pad — в дюймах).
     cax = make_axes_locatable(ax).append_axes("right", size=0.22, pad=0.08)
     return fig.colorbar(mesh, cax=cax)
+
+
+def draw_toroidal_view(
+    ax: Axes,
+    phi_rad: float,
+    *,
+    title: str = "",
+    radius: float = 1.0,
+) -> None:
+    """Топ-вид тора: кольцо и стрелка-«часовая» под углом ``phi_rad``.
+
+    ``phi_rad`` — тороидальный угол в радианах, отсчитываемый от ``+x``
+    против часовой стрелки (стандартная ориентация ``(R, phi, Z)``).
+    Рисуется **схема** (данные поля не участвуют) — компас, показывающий,
+    какое полоидальное сечение выбрано слайдером ``phi``.
+    """
+    ax.set_aspect("equal")
+    ax.add_patch(Circle((0.0, 0.0), radius, fill=False, color="0.35", lw=1.5))
+    ax.add_patch(Circle((0.0, 0.0), 0.04 * radius, color="0.35"))
+    # Засечки и подписи опорных углов.
+    for deg in (0, 90, 180, 270):
+        angle = np.deg2rad(deg)
+        cos, sin = np.cos(angle), np.sin(angle)
+        ax.plot(
+            [0.9 * radius * cos, radius * cos],
+            [0.9 * radius * sin, radius * sin],
+            color="0.6", lw=1,
+        )
+        ax.text(
+            1.16 * radius * cos, 1.16 * radius * sin, f"{deg}°",
+            ha="center", va="center", fontsize=7, color="0.4",
+        )
+    # Стрелка-«часовая» из центра на текущий угол.
+    ax.annotate(
+        "",
+        xy=(radius * np.cos(phi_rad), radius * np.sin(phi_rad)),
+        xytext=(0.0, 0.0),
+        arrowprops=dict(
+            arrowstyle="-|>", lw=2, color="crimson", mutation_scale=14
+        ),
+    )
+    limit = 1.35 * radius
+    ax.set_xlim(-limit, limit)
+    ax.set_ylim(-limit, limit)
+    ax.set_axis_off()
+    ax.set_title(f"{title} (топ-вид)" if title else "топ-вид", fontsize=8)
+    ax.text(
+        0.5, -0.04, f"phi = {np.rad2deg(phi_rad):.1f}°",
+        transform=ax.transAxes, ha="center", va="top", fontsize=9,
+    )
 
 
 Curve = tuple[np.ndarray | None, np.ndarray, str, str | None]
