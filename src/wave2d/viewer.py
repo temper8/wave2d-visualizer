@@ -33,6 +33,8 @@ from src.wave2d.schema import (
     MERGED_LAYOUT,
     MERGED_LAYOUT_NPHI_AXIS,
     NPHI,
+    SPECTRUM_AN,
+    SPECTRUM_N,
     STACK_COORD,
     STACK_NAME,
     format_version_of,
@@ -99,6 +101,7 @@ class W2DViewer:
             paned,
             coords=self._load_coords(),
             major_radius=self._load_major_radius(),
+            spectrum_an=self._load_spectrum_an(),
             rho=self._load_axis(GRID_RHO),
             psi=self._load_axis(GRID_PSI),
             on_add_to_comparison=self._add_to_comparison,
@@ -119,6 +122,20 @@ class W2DViewer:
     def _load_major_radius(self) -> np.ndarray | None:
         """Большой радиус ``R(rho,theta)`` (см) для топ-вида экватора или ``None``."""
         return self._array(GEOMETRY_R)
+
+    def _load_spectrum_an(self) -> dict[int, complex]:
+        """Веса ``An(n)`` спектра антенны для реконструкции одной моды ``nphi``.
+
+        ``{}``, если ``/spectrum`` в файле нет (тогда вес считается равным 1).
+        """
+        try:
+            if self.reader.contains(SPECTRUM_N) and self.reader.contains(SPECTRUM_AN):
+                n = self.reader.array(SPECTRUM_N)
+                an = self.reader.array(SPECTRUM_AN)
+                return {int(k): complex(v) for k, v in zip(n, an)}
+        except Exception:
+            pass
+        return {}
 
     def _load_axis(self, path: str) -> tuple[np.ndarray, Any] | None:
         """1D-ось ``(массив, units)`` из файла или ``None`` (нет/ошибка)."""

@@ -224,6 +224,74 @@ def draw_equatorial_view(
     return fig.colorbar(mesh, cax=cax)
 
 
+def draw_equatorial_map(
+    ax: Axes,
+    fig: Figure,
+    *,
+    phi_rad: np.ndarray,
+    radius_out: np.ndarray,
+    radius_in: np.ndarray,
+    values_out: np.ndarray,
+    values_in: np.ndarray,
+    current: int = 0,
+    title: str = "",
+    cmap: str = "viridis",
+    fill: bool = False,
+    xlabel: str = "R, cm",
+) -> Colorbar:
+    """Вариант B: плоская развёртка экватора ``(R, phi)``.
+
+    Ось X — большой радиус ``R`` (см), ось Y — тороидальный угол ``phi``
+    (град). Точки мидплейна ``theta=0`` (наружу) и ``theta=180`` (внутрь)
+    объединяются и сортируются по ``R``; ``values_out``/``values_in`` имеют
+    форму ``(Nr, Nphi)``. ``fill=True`` — заливка ``pcolormesh`` (нужно
+    ``>= 2`` углов), иначе — маркеры ``scatter``. Текущий ``phi`` (индекс
+    ``current``) показан горизонтальной линией. Возвращает colorbar.
+    """
+    phi_deg = np.rad2deg(np.asarray(phi_rad, dtype=float))
+    r = np.concatenate(
+        [np.asarray(radius_out, dtype=float), np.asarray(radius_in, dtype=float)]
+    )
+    values = np.concatenate(
+        [np.asarray(values_out), np.asarray(values_in)], axis=0
+    )
+    order = np.argsort(r)
+    r, values = r[order], values[order]
+    # ``rho = 0`` даёт ``R0`` с обеих сторон — дубликаты радиусов убираем.
+    keep = np.concatenate([[True], np.diff(r) > 1e-9])
+    r, values = r[keep], values[keep]
+    if fill and phi_deg.size >= 2 and r.size >= 2:
+        # Сетка (phi × R): значения транспонируем под форму X/Y.
+        xx, yy = np.meshgrid(r, phi_deg)
+        mesh = ax.pcolormesh(xx, yy, values.T, shading="gouraud", cmap=cmap)
+    else:
+        xx = np.tile(r, phi_deg.size)
+        yy = np.repeat(phi_deg, r.size)
+        mesh = ax.scatter(
+            xx, yy, c=values.T.ravel(), s=4, cmap=cmap, marker="s",
+            linewidths=0,
+        )
+    r_min, r_max = float(r.min()), float(r.max())
+    ax.set_xlim(r_min, r_max)
+    ax.set_ylim(float(phi_deg.min()), float(phi_deg.max()))
+    ax.set_xlabel(xlabel, fontsize=7)
+    ax.set_ylabel("phi, deg", fontsize=7)
+    ax.tick_params(labelsize=6)
+    if 0 <= current < phi_deg.size:
+        yc = float(phi_deg[current])
+        # Текущий угол — горизонтальная линия через всю развёртку.
+        ax.plot(
+            [r_min, r_max], [yc, yc],
+            color="crimson", lw=1.8, solid_capstyle="round",
+        )
+    ax.set_title(
+        f"{title} (equator Z=0, flat)" if title else "equator Z=0, flat",
+        fontsize=8,
+    )
+    cax = make_axes_locatable(ax).append_axes("right", size=0.14, pad=0.06)
+    return fig.colorbar(mesh, cax=cax)
+
+
 Curve = tuple[np.ndarray | None, np.ndarray, str, str | None]
 """1D-ряд для :func:`draw_curves`: ``(x, y, label, color)``.
 

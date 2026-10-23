@@ -6,9 +6,12 @@
   ``(rho,theta)``, с выбором составляющей ``real``/``imag``/``abs`` и colorbar;
 - **3D-стек** — срез файла с осью стека последней (моды ``nphi`` у merged или
   угол ``phi`` у ``total_fields.hdf5``): слайдер оси + та же отрисовка, что для
-  2D (поле) или 1D (профиль); для оси ``phi`` — чекбокс «Экватор (Z=0)»
+  2D (поле) или 1D (профиль); для оси ``phi`` — чекбокс «Equator (Z=0)»
   (топ-вид тора: экваториальное сечение ``Z=0`` при наличии ``/geometry/R``
-  либо схема-компас со стрелкой на текущем ``phi``);
+  либо схема-компас со стрелкой на текущем ``phi``); для одной моды ``nphi``
+  экватор реконструируется как ``An(n)·e^{i·n·phi}·E_n`` и добавляется
+  **второй слайдер** угла ``phi``, а также переключатель **Ring / Flat (R,phi)**
+  (полярный топ-вид или плоская развёртка ``R``×``phi``);
 - **1D** — одна или **несколько** линий против общей оси
   ``index``/``rho``/``psi`` (``rho``/``psi`` — если переданы и совпадают по
   длине у всех рядов) с подписями из атрибута ``units`` и легендой;
@@ -45,9 +48,13 @@ from src.wave2d.renderers import (
     component,
     draw_2d,
     draw_curves,
+    draw_equatorial_map,
     draw_equatorial_view,
     draw_toroidal_view,
 )
+
+#: Число точек тороидального угла при реконструкции одной моды ``nphi`` (1°).
+PHI_SAMPLES = 360
 
 
 def _units_text(units: Any) -> str:
@@ -90,6 +97,7 @@ class DatasetView(ttk.Frame):
         rho: tuple[np.ndarray, Any] | None = None,
         psi: tuple[np.ndarray, Any] | None = None,
         major_radius: np.ndarray | None = None,
+        spectrum_an: dict[int, complex] | None = None,
         on_add_to_comparison: Callable[[Selection], None] | None = None,
         **kwargs,
     ) -> None:
@@ -99,8 +107,10 @@ class DatasetView(ttk.Frame):
         self.Z: np.ndarray | None = None
         self.set_coords(coords)
         self.major_radius: np.ndarray | None = None
+        self.spectrum_an: dict[int, complex] = {}
         self._toroidal_colorbar = None
         self.set_major_radius(major_radius)
+        self.set_spectrum_an(spectrum_an)
         self._axes: dict[str, tuple[np.ndarray, Any]] = {}
         self.set_axes(rho, psi)
         self._colorbar = None
@@ -133,6 +143,17 @@ class DatasetView(ttk.Frame):
             None if major_radius is None else np.asarray(major_radius)
         )
 
+    def set_spectrum_an(
+        self, spectrum_an: dict[int, complex] | None
+    ) -> None:
+        """Задаёт веса ``An(n)`` спектра антенны для реконструкции моды ``nphi``.
+
+        ``None``/пусто — реконструкция одной моды считает вес равным ``1``.
+        """
+        self.spectrum_an = {
+            int(k): complex(v) for k, v in (spectrum_an or {}).items()
+        }
+
     def set_axes(
         self,
         rho: tuple[np.ndarray, Any] | None = None,
@@ -159,17 +180,24 @@ class DatasetView(ttk.Frame):
         датасета и собирается в :meth:`_rebuild_controls`.
         """
         self.controls = ttk.Frame(self)
+        #: Вторая строка переключателей (угол + экватор) — не влезает в одну.
+        self.controls_row2 = ttk.Frame(self)
         # Выборы переживают смену датасета: переключатели пересобираются, а
         # значения (2D-вид, составляющая, ось) сохраняются.
         self.view_var = tk.StringVar(value="rz" if self.R is not None else "rho")
         self.comp_var = tk.StringVar(value="abs")
         self.axis_var = tk.StringVar(value="index")
         self.mode_var = tk.IntVar(value=0)
-        #: Чекбокс «Экватор (Z=0)» (топ-вид тора рядом с полоидальной картой).
+        #: Слайдер тороидального угла (реконструкция одной моды ``nphi``).
+        self.phi_var = tk.IntVar(value=0)
+        #: Чекбокс «Equator (Z=0)» (топ-вид тора рядом с полоидальной картой).
         self.toroidal_var = tk.BooleanVar(value=True)
-        #: Чекбокс «Заливка» (топ-вид экватора через ``pcolormesh`` вместо маркеров).
+        #: Чекбокс «Fill» (экватор через ``pcolormesh`` вместо маркеров).
         self.fill_var = tk.BooleanVar(value=False)
+        #: Переключатель вида экватора: ``ring`` (полярный) или ``flat`` (R,phi).
+        self.equator_view_var = tk.StringVar(value="ring")
         self._mode_label: ttk.Label | None = None
+        self._phi_label: ttk.Label | None = None
 
         # Две панели: полоидальная карта (широкая) и топ-вид тора (узкая).
         # Топ-вид скрыт, пока не запрошен чекбоксом; ``constrained`` layout
@@ -210,13 +238,15 @@ class DatasetView(ttk.Frame):
             return
         self._attr_expanded = expanded
         for widget in (
-            self.controls, self.canvas_widget, self.toolbar, self.attr_frame
+            self.controls, self.controls_row2, self.canvas_widget,
+            self.toolbar, self.attr_frame,
         ):
             widget.pack_forget()
         if expanded:
             self.attr_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         else:
-            self.controls.pack(side=tk.TOP, fill=tk.X, padx=4, pady=4)
+            self.controls.pack(side=tk.TOP, fill=tk.X, padx=4, pady=(4, 0))
+            self.controls_row2.pack(side=tk.TOP, fill=tk.X, padx=4, pady=(0, 4))
             self.canvas_widget.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
             self.toolbar.pack(side=tk.BOTTOM)
 
@@ -327,9 +357,11 @@ class DatasetView(ttk.Frame):
         составляющая, 1D — ось (и составляющая для комплексных данных),
         ``attrs``/``message`` — панель пуста.
         """
-        for child in self.controls.winfo_children():
-            child.destroy()
+        for parent in (self.controls, self.controls_row2):
+            for child in parent.winfo_children():
+                child.destroy()
         self._mode_label = None
+        self._phi_label = None
 
         if mode == "2d":
             self._add_view_buttons()
@@ -415,14 +447,20 @@ class DatasetView(ttk.Frame):
     # --- стек по модам (3D) ----------------------------------------------
 
     def _add_stacked_controls(self) -> None:
-        """Переключатели стека: слайдер моды/угла, затем вид/ось/составляющая."""
+        """Переключатели стека: слайдер моды/угла, затем вид/ось/составляющая.
+
+        Для одной моды ``nphi`` с геометрией добавляется второй слайдер
+        (тороидальный угол) и переключатели экватора (Ring / Flat (R,phi)).
+        """
         first = self._selections[0]
         self._add_mode_scale(first)
         if first.data is None:
             return
         if first.data.ndim - 1 == 2:
-            if first.mode_name == "phi":
-                self._add_toroidal_toggle()
+            if first.mode_name == "nphi" and self._equatorial_ready(first):
+                self._add_angle_scale()
+            if first.mode_name == "phi" or self._equatorial_ready(first):
+                self._add_equator_controls()
             self._add_view_buttons()
             self._add_comp_buttons()
         else:
@@ -452,22 +490,51 @@ class DatasetView(ttk.Frame):
         self._mode_label = ttk.Label(frame, text=self._mode_value(selection))
         self._mode_label.pack(side=tk.LEFT, padx=(6, 0))
 
-    def _add_toroidal_toggle(self) -> None:
-        """Чекбоксы топ-вида: «Экватор (Z=0)» и «Заливка» экватора.
+    def _add_angle_scale(self) -> None:
+        """Второй слайдер: тороидальный угол для реконструкции одной моды ``nphi``.
 
-        Доступны только датасетам с осью ``phi`` (``total_fields.hdf5``) —
-        то есть выставляются для каждой компоненты (``Ex``/``Ey``/``Ez``/``Ea``).
-        «Заливка» включает ``pcolormesh`` вместо ``scatter`` (интерполяция
-        между ``phi``); при одном угле она игнорируется.
+        Слайдер идёт по равномерной сетке :data:`PHI_SAMPLES` на ``[0, 2π)``;
+        один его шаг — ``1°``.
+        """
+        if not 0 <= self.phi_var.get() < PHI_SAMPLES:
+            self.phi_var.set(0)
+        frame = ttk.Frame(self.controls_row2)
+        frame.pack(side=tk.LEFT, padx=(0, 20))
+        ttk.Label(frame, text="angle:").pack(side=tk.LEFT)
+        tk.Scale(
+            frame, from_=0, to=PHI_SAMPLES - 1, orient=tk.HORIZONTAL,
+            showvalue=False, variable=self.phi_var, length=150,
+            command=lambda _value: self.redraw(),
+        ).pack(side=tk.LEFT)
+        self._phi_label = ttk.Label(frame, text=f"phi={self.phi_var.get()}°")
+        self._phi_label.pack(side=tk.LEFT, padx=(6, 0))
+
+    def _add_equator_controls(self) -> None:
+        """Экватор ``Z=0``: чекбокс, переключатель Ring/Flat (R,phi) и «Fill».
+
+        Доступно датасетам с осью ``phi`` (``total_fields.hdf5``) и одной моде
+        ``nphi`` merged-файла (реконструкция ``An(n)·e^{i·n·phi}``). «Ring» —
+        полярный топ-вид (кольцо), «Flat (R,phi)» — плоская развёртка
+        ``R``×``phi``. «Fill» включает ``pcolormesh`` вместо ``scatter``.
         """
         ttk.Checkbutton(
-            self.controls,
+            self.controls_row2,
             text="Equator (Z=0)",
             variable=self.toroidal_var,
             command=self.redraw,
         ).pack(side=tk.LEFT, padx=(0, 20))
+        frame = ttk.Frame(self.controls_row2)
+        frame.pack(side=tk.LEFT, padx=(0, 20))
+        ttk.Radiobutton(
+            frame, text="Ring", variable=self.equator_view_var,
+            value="ring", command=self.redraw,
+        ).pack(side=tk.LEFT)
+        ttk.Radiobutton(
+            frame, text="Flat (R,phi)", variable=self.equator_view_var,
+            value="flat", command=self.redraw,
+        ).pack(side=tk.LEFT)
         ttk.Checkbutton(
-            self.controls,
+            self.controls_row2,
             text="Fill",
             variable=self.fill_var,
             command=self.redraw,
@@ -504,6 +571,8 @@ class DatasetView(ttk.Frame):
         sliced = self._slice(selection)
         if self._mode_label is not None:
             self._mode_label.configure(text=self._mode_value(selection))
+        if self._phi_label is not None:
+            self._phi_label.configure(text=f"phi={int(self.phi_var.get())}°")
         title = selection.path or ""
         value = self._mode_value(selection)
         if value:
@@ -528,63 +597,148 @@ class DatasetView(ttk.Frame):
             self._draw_toroidal(selection)
 
     def _draw_toroidal(self, selection: Selection) -> None:
-        """Топ-вид тора рядом с картой, если включён и есть ось ``phi``.
+        """Топ-вид экватора рядом с картой, если включён.
 
-        При наличии ``/geometry/R`` рисуется экваториальное сечение ``Z=0``
-        (данные поля); иначе — схема-компас со стрелкой на текущем ``phi``.
+        Для оси ``phi`` — экваториальное сечение из данных (или схема-компас
+        без ``/geometry/R``). Для оси ``nphi`` — реконструкция одной моды
+        ``An(n)·e^{i·n·phi}·E_n``; без геометрии топ-вид не рисуется.
         """
-        if selection.mode_name != "phi" or not self.toroidal_var.get():
+        if not self.toroidal_var.get() or selection.data is None:
             return
-        values = selection.mode_values
-        if values is None or len(values) == 0:
+        ready = selection.mode_name == "phi" or (
+            selection.mode_name == "nphi" and self._equatorial_ready(selection)
+        )
+        if not ready:
             return
-        index = min(max(int(self.mode_var.get()), 0), len(values) - 1)
         self.ax_tor.set_visible(True)
         self.ax_tor.clear()
-        if self._draw_equatorial(selection, index):
+        if self._draw_equatorial(selection):
             return
+        # Фолбэк: схема-компас без данных (только для оси phi).
+        values = selection.mode_values
+        if selection.mode_name != "phi" or values is None or len(values) == 0:
+            self.ax_tor.set_visible(False)
+            return
+        index = min(max(int(self.mode_var.get()), 0), len(values) - 1)
         draw_toroidal_view(
             self.ax_tor, float(values[index]), title=selection.path or ""
         )
 
-    def _draw_equatorial(self, selection: Selection, index: int) -> bool:
-        """Рисует экваториальное сечение ``Z=0`` вместо схемы-компаса.
+    def _equatorial_ready(self, selection: Selection) -> bool:
+        """Есть ли геометрия и мидплейн для экваториального сечения ``Z=0``."""
+        major = self.major_radius
+        data = selection.data
+        if major is None or data is None or data.ndim != 3:
+            return False
+        if selection.mode_name not in ("phi", "nphi"):
+            return False
+        if major.shape != data.shape[:2]:
+            return False
+        return self._midplane_indices(major) is not None
 
-        Возвращает ``False``, если нет ``/geometry/R`` или не найден мидплейн
-        (тогда вызывающий рисует схему). Точки ``theta=0`` (наружу) и
-        ``theta=180`` (внутрь) кладутся в полярные координаты по большому
-        радиусу; нефизичные сентинелы ``R <= 0`` отбрасываются.
+    def _draw_equatorial(self, selection: Selection) -> bool:
+        """Рисует экваториальное сечение ``Z=0`` (Ring или Flat).
+
+        Возвращает ``False``, если нет ``/geometry/R`` или мидплейна. Для оси
+        ``phi`` берутся данные по углам; для оси ``nphi`` — реконструкция
+        одной моды на сетке углов :data:`PHI_SAMPLES`.
         """
         major = self.major_radius
         data = selection.data
-        phi = selection.mode_values
-        if major is None or data is None or phi is None:
+        if major is None or data is None or data.ndim != 3:
             return False
-        if data.ndim != 3 or major.shape != data.shape[:2]:
+        if major.shape != data.shape[:2]:
             return False
         indices = self._midplane_indices(major)
         if indices is None:
             return False
         i_out, i_in = indices
-        values = component(data, self.comp_var.get())
-        r_out, r_in = major[:, i_out], major[:, i_in]
+        if selection.mode_name == "phi":
+            built = self._equatorial_from_phi(selection, i_out, i_in)
+        elif selection.mode_name == "nphi":
+            built = self._equatorial_single_mode(selection, i_out, i_in)
+        else:
+            return False
+        if built is None:
+            return False
+        phi_rad, r_out, r_in, values_out, values_in, current = built
         keep_out = np.isfinite(r_out) & (r_out > 0)
         keep_in = np.isfinite(r_in) & (r_in > 0)
         if not keep_out.any() or not keep_in.any():
             return False
-        self._toroidal_colorbar = draw_equatorial_view(
-            self.ax_tor,
-            self.fig,
-            phi_rad=np.asarray(phi, dtype=float),
+        kwargs = dict(
+            phi_rad=phi_rad,
             radius_out=r_out[keep_out],
             radius_in=r_in[keep_in],
-            values_out=values[keep_out, i_out, :],
-            values_in=values[keep_in, i_in, :],
-            current=index,
+            values_out=values_out[keep_out],
+            values_in=values_in[keep_in],
+            current=current,
             title=selection.path or "",
             fill=self.fill_var.get(),
         )
+        if self.equator_view_var.get() == "flat":
+            self._toroidal_colorbar = draw_equatorial_map(
+                self.ax_tor, self.fig, **kwargs
+            )
+        else:
+            self._toroidal_colorbar = draw_equatorial_view(
+                self.ax_tor, self.fig, **kwargs
+            )
         return True
+
+    def _equatorial_from_phi(
+        self, selection: Selection, i_out: int, i_in: int
+    ) -> tuple[
+        np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int
+    ] | None:
+        """Экватор для оси ``phi``: ``(phi, R_out, R_in, V_out, V_in, cur)``."""
+        phi = selection.mode_values
+        data = selection.data
+        major = self.major_radius
+        if phi is None or data is None or major is None or len(phi) == 0:
+            return None
+        index = min(max(int(self.mode_var.get()), 0), len(phi) - 1)
+        values = component(data, self.comp_var.get())
+        return (
+            np.asarray(phi, dtype=float),
+            major[:, i_out], major[:, i_in],
+            values[:, i_out, :], values[:, i_in, :],
+            index,
+        )
+
+    def _equatorial_single_mode(
+        self, selection: Selection, i_out: int, i_in: int
+    ) -> tuple[
+        np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int
+    ] | None:
+        """Реконструкция экватора одной моды ``nphi``: ``An(n)·e^{i·n·phi}·E_n``.
+
+        Угол — равномерная сетка :data:`PHI_SAMPLES` на ``[0, 2π)``; вес
+        ``An(n)`` берётся из спектра (``1``, если его нет). Возвращает
+        ``(phi_rad, R_out, R_in, V_out, V_in, current)``.
+        """
+        modes = selection.mode_values
+        data = selection.data
+        major = self.major_radius
+        if modes is None or data is None or major is None or len(modes) == 0:
+            return None
+        imode = min(max(int(self.mode_var.get()), 0), len(modes) - 1)
+        n = int(modes[imode])
+        weight = self.spectrum_an.get(n, 1.0 + 0.0j)
+        phi = np.arange(PHI_SAMPLES, dtype=float) * (2.0 * np.pi / PHI_SAMPLES)
+        wave = weight * np.exp(1.0j * n * phi)
+        comp = self.comp_var.get()
+        e_out = data[:, i_out, imode]
+        e_in = data[:, i_in, imode]
+        values_out = component(e_out[:, None] * wave[None, :], comp)
+        values_in = component(e_in[:, None] * wave[None, :], comp)
+        current = min(max(int(self.phi_var.get()), 0), PHI_SAMPLES - 1)
+        return (
+            phi,
+            major[:, i_out], major[:, i_in],
+            values_out, values_in,
+            current,
+        )
 
     def _midplane_indices(
         self, major: np.ndarray

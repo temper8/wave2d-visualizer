@@ -159,6 +159,8 @@ POWER_BALANCE = "/power_balance"
 
 # Run-level тороидальный спектр антенны An(n) (>= 0.96): n, An, abs2.
 SPECTRUM = "/spectrum"
+SPECTRUM_N = f"{SPECTRUM}/n"
+SPECTRUM_AN = f"{SPECTRUM}/An"
 
 # --- объединённый файл (производный артефакт viewer'а, см. src/wave2d/merge.py) ---
 
