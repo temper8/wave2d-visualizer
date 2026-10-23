@@ -125,11 +125,16 @@ class Wave2DNavigator(Navigator):
         return self.root
 
     def cases(self) -> list[str]:
-        """Список кейсов = подкаталогов папки Wave2D (каждый — постановка)."""
+        """Список кейсов = подкаталогов папки Wave2D (каждый — постановка).
+
+        ``os.scandir`` вместо ``iterdir()``: ``DirEntry.is_dir()`` берётся из
+        листинга каталога без дополнительного ``stat`` на каждый элемент.
+        """
         root = self.root
         if not root.is_dir():
             return []
-        return sorted(p.name for p in root.iterdir() if p.is_dir())
+        with os.scandir(root) as entries:
+            return sorted(e.name for e in entries if e.is_dir())
 
     def case_dir(self, case_id: str) -> Path:
         """Каталог кейса: ``<root>/<case_id>``."""
@@ -174,11 +179,12 @@ class Wave2DNavigator(Navigator):
         return self.run_dir(run_id) / "tasks" / task / name
 
     def tasks(self, run_id: str) -> list[str]:
-        """Список задач прогона = подкаталоги ``<run>/tasks``."""
+        """Список задач прогона = подкаталоги ``<run>/tasks`` (через ``scandir``)."""
         tasks_dir = self.run_dir(run_id) / "tasks"
         if not tasks_dir.is_dir():
             return []
-        return sorted(p.name for p in tasks_dir.iterdir() if p.is_dir())
+        with os.scandir(tasks_dir) as entries:
+            return sorted(e.name for e in entries if e.is_dir())
 
     def runs(self, case_id: str | None = None) -> list[str]:
         """Список прогонов: внутри кейса или по всем кейсам (``case_id=None``)."""
@@ -215,11 +221,11 @@ class Wave2DNavigator(Navigator):
             for name in ("results.h5", "report.h5")
         ):
             runs.append(case_id)
-        runs.extend(
-            f"{case_id}/{p.name}"
-            for p in sorted(case_dir.iterdir(), key=lambda p: p.name)
-            if p.is_dir() and _STAMP_RE.match(p.name)
-        )
+        with os.scandir(case_dir) as entries:
+            stamped = sorted(
+                e.name for e in entries if e.is_dir() and _STAMP_RE.match(e.name)
+            )
+        runs.extend(f"{case_id}/{name}" for name in stamped)
         return runs
 
 
