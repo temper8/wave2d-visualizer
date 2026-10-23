@@ -1,8 +1,10 @@
 """GUI-навигатор по каталогу Wave2D: выбор прогона и запуск viewer.
 
 Дерево строится динамически по файловой системе через
-:class:`~src.common.navigator.Wave2DNavigator` (кейсы → прогоны → задачи),
-в листьях — реальные HDF5-файлы (``results.h5``, ``report.h5``). Выбор листа
+:class:`~src.common.navigator.Wave2DNavigator` (кейсы → прогоны → папка
+``tasks`` → задачи), в листьях — реальные HDF5-файлы (``results.h5``,
+``report.h5``). Список задач и проверка их файлов выполняются лениво —
+при раскрытии папки ``tasks`` и выборе конкретной задачи соответственно. Выбор листа
 показывает сводку ``report``/``input``; выбор **папки прогона** — краткую
 сводку по прогону (артефакты, задачи, статусы, сборка) и включает панель
 кнопок действий с прогоном. Кнопка (или двойной клик) открывает
@@ -76,6 +78,8 @@ class W2DNavigatorApp:
         self._runs: dict[str, str] = {}  # iid узла-прогона -> run_id
         # iid узлов, чьи дети (задачи) уже достроены (ленивое раскрытие).
         self._loaded: set[str] = set()
+        # iid узла-папки ``tasks`` -> run_id.
+        self._folders: dict[str, str] = {}
         # iid узла-задачи -> ожидаемый ``results.h5`` (ещё не проверен).
         self._task_files: dict[str, Path] = {}
         # iid задач без файла (проверено лениво — повторно не stat).
@@ -393,7 +397,7 @@ class W2DNavigatorApp:
                 self._runs[node] = run_id
                 self._add_run_artifacts(node, run_id)
                 self._add_derived_node(node, run_id)
-                self._add_lazy_tasks(node, run_id)
+                self._add_tasks_folder(node, run_id)
 
     def _add_run_artifacts(self, parent: str, run_id: str) -> None:
         """Добавляет run-level файлы прогона: ``results.h5`` и/или ``report.h5``."""
@@ -409,25 +413,21 @@ class W2DNavigatorApp:
             if path.is_file():
                 self._add_results_node(parent, path)
 
-    def _add_lazy_tasks(self, parent: str, run_id: str) -> None:
-        """Ставит заглушку под задачи прогона (дети — по раскрытию узла).
+    def _add_tasks_folder(self, parent: str, run_id: str) -> None:
+        """Добавляет узел-папку ``tasks`` с ленивыми детьми.
 
-        Обход ``tasks/`` и ``stat`` по каждой задаче — самая дорогая часть при
-        большом числе задач (особенно на сетевой шаре), поэтому откладывается
-        до ``<<TreeviewOpen>>`` (:meth:`on_open`). Существование ``results.h5``
-        проверяется ещё позже — при выборе конкретной задачи (:meth:`_resolve_task`).
+        Список задач (сотни листингов и ``stat`` на сетевой шаре) строится не
+        при раскрытии прогона, а только при раскрытии **самой папки** —
+        ``<<TreeviewOpen>>`` (:meth:`on_open`). Прогон с 245 задачами
+        раскрывается в один компактный узел.
         """
         tasks_dir = self.nav.run_dir(run_id) / "tasks"
         if not fsprobe.is_dir(tasks_dir):
             return
-        # Уже раскрытый узел (legacy-плоский прогон = узел кейса, ``open=True``):
-        # событие ``<<TreeviewOpen>>`` не придёт — грузим задачи сразу.
-        if self.tree.item(parent, "open"):
-            self._materialize_tasks(parent)
-            return
-        self.tree.insert(
-            parent, "end", iid=self._lazy_iid(parent), text="…", open=False
-        )
+        iid = f"folder::{parent}"
+        self.tree.insert(parent, "end", iid=iid, text="tasks", open=False)
+        self._folders[iid] = run_id
+        self.tree.insert(iid, "end", iid=self._lazy_iid(iid), text="…")
 
     @staticmethod
     def _lazy_iid(node: str) -> str:
@@ -435,20 +435,20 @@ class W2DNavigatorApp:
         return f"lazy::{node}"
 
     def on_open(self, event=None) -> None:
-        """Догружает задачи прогона при первом раскрытии узла."""
+        """Догружает задачи при первом раскрытии папки ``tasks``."""
         iid = self.tree.focus()
         if not iid:
             return
         self._materialize_tasks(iid)
 
     def _materialize_tasks(self, node: str) -> None:
-        """Один раз строит детей узла-прогона, убирая заглушку.
+        """Один раз строит детей узла-папки ``tasks``, убирая заглушку.
 
         Узлы задач вставляются без проверки ``results.h5``: ``stat`` по каждой
         задаче (дорогой на сетевой шаре) выполняется лениво — при первом выборе
         узла-задачи (:meth:`_resolve_task`).
         """
-        run_id = self._runs.get(node)
+        run_id = self._folders.get(node)
         if run_id is None or node in self._loaded:
             return
         self._loaded.add(node)
@@ -456,9 +456,7 @@ class W2DNavigatorApp:
         if self.tree.exists(dummy):
             self.tree.delete(dummy)
         for task in self.nav.tasks(run_id):
-            task_node = self.tree.insert(
-                node, "end", text=f"tasks/{task}", open=False
-            )
+            task_node = self.tree.insert(node, "end", text=task)
             self._task_files[task_node] = self.nav.task_results(run_id, task)
 
     def _resolve_task(self, node: str) -> None:
@@ -488,6 +486,7 @@ class W2DNavigatorApp:
         self._paths.clear()
         self._runs.clear()
         self._loaded.clear()
+        self._folders.clear()
         self._task_files.clear()
         self._missing.clear()
         self.selected = None
@@ -519,6 +518,10 @@ class W2DNavigatorApp:
             )
         elif run_id is not None:
             self._show_run_info(run_id)
+        elif iid is not None and iid in self._folders:
+            # Папка ``tasks``: показываем сводку прогона, но выбором прогона
+            # не считается (иначе производные узлы цеплялись бы к папке).
+            self._show_run_info(self._folders[iid])
         else:
             # Выбрана папка кейса или ничего — правая панель пуста.
             self._set_info("")
