@@ -76,6 +76,10 @@ class W2DNavigatorApp:
         self._runs: dict[str, str] = {}  # iid узла-прогона -> run_id
         # iid узлов, чьи дети (задачи) уже достроены (ленивое раскрытие).
         self._loaded: set[str] = set()
+        # iid узла-задачи -> ожидаемый ``results.h5`` (ещё не проверен).
+        self._task_files: dict[str, Path] = {}
+        # iid задач без файла (проверено лениво — повторно не stat).
+        self._missing: set[str] = set()
         self.selected: Path | None = None
 
         # Состояние выбранного прогона и фонового слияния по nphi.
@@ -410,7 +414,8 @@ class W2DNavigatorApp:
 
         Обход ``tasks/`` и ``stat`` по каждой задаче — самая дорогая часть при
         большом числе задач (особенно на сетевой шаре), поэтому откладывается
-        до ``<<TreeviewOpen>>`` (:meth:`on_open`).
+        до ``<<TreeviewOpen>>`` (:meth:`on_open`). Существование ``results.h5``
+        проверяется ещё позже — при выборе конкретной задачи (:meth:`_resolve_task`).
         """
         tasks_dir = self.nav.run_dir(run_id) / "tasks"
         if not fsprobe.is_dir(tasks_dir):
@@ -437,7 +442,12 @@ class W2DNavigatorApp:
         self._materialize_tasks(iid)
 
     def _materialize_tasks(self, node: str) -> None:
-        """Один раз строит детей узла-прогона, убирая заглушку."""
+        """Один раз строит детей узла-прогона, убирая заглушку.
+
+        Узлы задач вставляются без проверки ``results.h5``: ``stat`` по каждой
+        задаче (дорогой на сетевой шаре) выполняется лениво — при первом выборе
+        узла-задачи (:meth:`_resolve_task`).
+        """
         run_id = self._runs.get(node)
         if run_id is None or node in self._loaded:
             return
@@ -446,12 +456,22 @@ class W2DNavigatorApp:
         if self.tree.exists(dummy):
             self.tree.delete(dummy)
         for task in self.nav.tasks(run_id):
-            task_path = self.nav.task_results(run_id, task)
-            if task_path.is_file():
-                task_node = self.tree.insert(
-                    node, "end", text=f"tasks/{task}", open=False
-                )
-                self._add_results_node(task_node, task_path)
+            task_node = self.tree.insert(
+                node, "end", text=f"tasks/{task}", open=False
+            )
+            self._task_files[task_node] = self.nav.task_results(run_id, task)
+
+    def _resolve_task(self, node: str) -> None:
+        """Лениво проверяет ``results.h5`` задачи при первом выборе её узла."""
+        if node not in self._task_files or node in self._missing:
+            return
+        if node in self._paths:
+            return
+        path = self._task_files[node]
+        if fsprobe.is_file(path):
+            self._paths[node] = path
+        else:
+            self._missing.add(node)
 
     def _add_results_node(self, parent: str, path: Path) -> None:
         if not path.is_file():
@@ -468,6 +488,8 @@ class W2DNavigatorApp:
         self._paths.clear()
         self._runs.clear()
         self._loaded.clear()
+        self._task_files.clear()
+        self._missing.clear()
         self.selected = None
         self.selected_run = None
         self.selected_run_node = None
@@ -480,6 +502,8 @@ class W2DNavigatorApp:
     def on_select(self, event=None) -> None:
         selection = self.tree.selection()
         iid = selection[0] if selection else None
+        if iid is not None:
+            self._resolve_task(iid)
         path = self._paths.get(iid) if iid else None
         run_id = self._runs.get(iid) if iid else None
         self.selected = path
@@ -489,6 +513,10 @@ class W2DNavigatorApp:
         self._refresh_run_actions()
         if path is not None:
             self._show_file_info(path)
+        elif iid is not None and iid in self._missing:
+            self._set_info(
+                f"Файл задачи отсутствует:\n{self._task_files.get(iid)}"
+            )
         elif run_id is not None:
             self._show_run_info(run_id)
         else:
