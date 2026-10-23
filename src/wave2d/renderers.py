@@ -140,7 +140,8 @@ def draw_equatorial_view(
     радиус (см): ``radius_out`` — сторона ``theta=0`` (наружу), ``radius_in`` —
     ``theta=180`` (внутрь). ``values_out``/``values_in`` — та же форма
     ``(Nr, Nphi)``. Поверх данных — границы плазмы, засечки опорных углов и
-    стрелка-«часовая» на текущем ``phi`` (индекс ``current``). Возвращает
+    стрелка-«часовая» на текущем ``phi`` (индекс ``current``); стрелка кончается
+    на **внутренней** границе кольца, чтобы не теряться в данных. Возвращает
     colorbar сечения (его снимает вызывающий перед следующей отрисовкой).
     """
     phi = np.asarray(phi_rad, dtype=float)
@@ -157,7 +158,8 @@ def draw_equatorial_view(
         s=6, cmap=cmap, marker="s", linewidths=0,
     )
     r_max = float(r.max())
-    for radius in (r_max, float(r.min())):
+    r_min = float(r.min())
+    for radius in (r_max, r_min):
         ax.add_patch(Circle((0.0, 0.0), radius, fill=False, color="0.5", lw=0.8))
     limit = 1.12 * r_max
     for deg in (0, 90, 180, 270):
@@ -176,7 +178,7 @@ def draw_equatorial_view(
         angle = float(phi[current])
         ax.annotate(
             "",
-            xy=(r_max * np.cos(angle), r_max * np.sin(angle)),
+            xy=(r_min * np.cos(angle), r_min * np.sin(angle)),
             xytext=(0.0, 0.0),
             arrowprops=dict(
                 arrowstyle="-|>", lw=1.8, color="crimson", mutation_scale=12
