@@ -75,6 +75,7 @@ src/
 │   ├── app.py               # W2DNavigatorApp — GUI-навигатор по прогонам
 │   ├── merge.py             # слияние задач по nphi (3D-стек) -> derived/runs/.../nphi_merged.h5
 │   ├── total_field.py       # сумма полей по спектру nphi -> total_fields.hdf5
+│   ├── run_info.py          # сводка по прогону (report/manifest) + кэш run_info.yaml
 │   ├── schema.py            # константы и проверка версии схемы HDF5
 │   └── assets/
 │       ├── w2d_app_icon.png # иконка окна (генератор — tools/make_icon.py)
@@ -125,7 +126,8 @@ data/
 └── derived/
     ├── runs/<case_id>/<stamp>/   # производные артефакты прогона (viewer)
     │   ├── nphi_merged.h5        # 3D-стек задач по nphi (кнопка «Слияние»)
-    │   └── total_fields.hdf5     # сумма полей по спектру nphi (w2d_total_field.py)
+    │   ├── total_fields.hdf5     # сумма полей по спектру nphi (w2d_total_field.py)
+    │   └── run_info.yaml         # кэш сводки по прогону (src/wave2d/run_info.py; версия RUN_INFO_VERSION)
     ├── plots/{FT-2_LH_smoke,FT-2_LH_smoke_nphi,FT2}/   # карты полей (w2d_render.py)
     ├── frames/WagD/          # 945 PNG кадров флуктуаций
     ├── video/                # fluctuations_evolution.mp4

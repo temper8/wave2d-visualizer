@@ -49,7 +49,7 @@ from src.common.settings import (
 from src.common.wsl import wsl_roots
 from src.wave2d.merge import merge_nphi_tasks, nphi_tasks
 from src.wave2d.total_field import total_field_pol_xs, write_total_fields
-from src.wave2d.run_info import collect_run_info, format_run_info, shallow_attrs
+from src.wave2d.run_info import get_run_info_text, shallow_attrs
 from src.wave2d.schema import (
     MANIFEST,
     REPORT,
@@ -753,10 +753,10 @@ class W2DNavigatorApp:
     def _show_run_info(self, run_id: str) -> None:
         """Краткая сводка по прогону: артефакты, задачи, статусы, сборка.
 
-        Чтение и форматирование вынесены в :mod:`src.wave2d.run_info`
+        Чтение, кэш и форматирование вынесены в :mod:`src.wave2d.run_info`
         (tkinter-независимы) — здесь только обновление панели.
         """
-        self._set_info(format_run_info(collect_run_info(self.nav, run_id)))
+        self._set_info(get_run_info_text(self.nav, run_id))
 
     def _show_file_info(self, path: Path) -> None:
         if not fsprobe.is_file(path):
