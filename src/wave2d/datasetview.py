@@ -705,19 +705,57 @@ class DatasetView(ttk.Frame):
         rgba = np.asarray(self.canvas.buffer_rgba())
         return np.ascontiguousarray(rgba[..., :3])
 
-    def animation_tokens(self) -> list[str]:
-        """Токены имени файла анимации: поле, ось и включённые переключатели.
+    def _stack_span_token(self, selection: Selection) -> str | None:
+        """Токен размаха оси стека по модам: ``-122..+122``.
 
-        Имя поля берётся как в файле (``Ex``, ``Ea``, …). Умолчательные
-        состояния не пишутся: вид ``rho`` и выключенный экватор опускаются,
-        составляющая — только для комплексных полей. Токен ``scale_*``
-        добавляет viewer (он знает выбор в диалоге Animate).
+        Только для оси ``nphi`` (merged), берётся фактический min..max по
+        :attr:`Selection.mode_values`. Угол ``phi`` (total_fields) всегда
+        покрывает полный оборот, поэтому его диапазон в имени не пишется —
+        важнее число шагов (:meth:`_phi_samples_token`). ``None`` — данных нет.
+        """
+        if selection.mode_name != "nphi":
+            return None
+        values = selection.mode_values
+        if values is None or len(values) == 0:
+            return None
+        array = np.asarray(values)
+        return f"{int(array.min()):+d}..{int(array.max()):+d}"
+
+    def _phi_samples_token(self, selection: Selection) -> str | None:
+        """Токен числа шагов по phi: ``phi_samples=180``.
+
+        Только для оси ``phi`` (total_fields): диапазон всегда полный оборот,
+        а разбиение может быть разным — в имени важно именно число шагов
+        (длина оси ``/phi``). ``None`` — другая ось или данных нет.
+        """
+        if selection.mode_name != "phi":
+            return None
+        values = selection.mode_values
+        if values is None or len(values) == 0:
+            return None
+        return f"phi_samples={len(values)}"
+
+    def animation_tokens(self) -> list[str]:
+        """Токены имени файла анимации: поле, ось, размах и шаги по phi.
+
+        Имя поля берётся как в файле (``Ex``, ``Ea``, …). Далее — ось стека,
+        затем размах мод (``-122..+122`` у ``nphi``) либо число шагов по phi
+        (``phi_samples=180`` у ``phi``). Умолчательные состояния не пишутся:
+        вид ``rho`` и выключенный экватор опускаются, составляющая — только для
+        комплексных полей. Токен ``scale_*`` добавляет viewer (он знает выбор
+        в диалоге Animate).
         """
         selection = self.stacked_selection()
         if selection is None:
             return []
         field = (selection.path or "").rsplit("/", 1)[-1] or "field"
         tokens = [field, selection.mode_name or "axis"]
+        for token in (
+            self._stack_span_token(selection),
+            self._phi_samples_token(selection),
+        ):
+            if token:
+                tokens.append(token)
         if np.iscomplexobj(selection.data):
             tokens.append(self.comp_var.get())
         if self.view_var.get() == "rz":
