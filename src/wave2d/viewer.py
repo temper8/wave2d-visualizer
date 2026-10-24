@@ -27,6 +27,7 @@ from tkinter import messagebox, ttk
 
 from src.common.h5reader import H5Reader
 from src.common.navigator import default_navigator
+from src.common.shell import open_in_default_app
 from src.wave2d.datasetview import DatasetView, Selection
 from src.wave2d.h5tree import H5TreeView
 from src.wave2d.multiview import AddResult, PlotItem, add_to_comparison
@@ -402,7 +403,8 @@ class W2DViewer:
         переключателей (:meth:`DatasetView.animation_tokens`) плюс
         ``scale_auto``/``scale_fixed``; при совпадении добавляется ``__2``,
         ``__3``. Результат — ``MP4`` рядом с исходным файлом, в подпапке
-        ``animations/``.
+        ``animations/``; по завершении предлагается открыть его системным
+        проигрывателем.
         """
         view = self.dataset_view
         if self._animating:
@@ -465,12 +467,19 @@ class W2DViewer:
             view.mode_var.set(original_index)
             view.redraw()
             progress.close()
-            if error is None:
-                messagebox.showinfo(
-                    "Animate", f"Saved:\n{out}", parent=self.root
-                )
-            else:
+            if error is not None:
                 messagebox.showerror("Animate", error, parent=self.root)
+                return
+            if messagebox.askyesno(
+                "Animate", f"Saved:\n{out}\n\nOpen video?", parent=self.root
+            ):
+                try:
+                    open_in_default_app(out)
+                except OSError as e:  # noqa: BLE001
+                    messagebox.showerror(
+                        "Open video", f"Could not open:\n{out}\n\n{e}",
+                        parent=self.root,
+                    )
 
         def step(index: int) -> None:
             if index >= length:

@@ -44,10 +44,7 @@ viewer по кнопке Animate) появляется в дереве лист�
 
 from pathlib import Path
 
-import os
 import queue
-import subprocess
-import sys
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
@@ -56,6 +53,7 @@ from src.common import fsprobe
 from src.common.h5reader import H5Reader
 from src.common.navigator import Wave2DNavigator, data_root
 from src.common.paths import merged_results, run_derived
+from src.common.shell import open_in_default_app
 from src.common.settings import (
     get_navigator_history,
     get_navigator_root,
@@ -670,8 +668,7 @@ class W2DNavigatorApp:
     def _open_video(self, path: Path) -> None:
         """Открывает ролик системным проигрывателем по умолчанию.
 
-        viewer не подходит: MP4 — не HDF5. Windows — ``os.startfile``,
-        macOS — ``open``, остальные — ``xdg-open``.
+        viewer не подходит: MP4 — не HDF5 (см. :func:`open_in_default_app`).
         """
         if not fsprobe.is_file(path):
             messagebox.showerror(
@@ -679,12 +676,7 @@ class W2DNavigatorApp:
             )
             return
         try:
-            if sys.platform.startswith("win"):
-                os.startfile(path)  # type: ignore[attr-defined]
-            elif sys.platform == "darwin":
-                subprocess.Popen(["open", str(path)])
-            else:
-                subprocess.Popen(["xdg-open", str(path)])
+            open_in_default_app(path)
         except OSError as e:
             messagebox.showerror(
                 "Open video", f"Could not open:\n{path}\n\n{e}",

@@ -65,6 +65,7 @@ src/
 ├── common/h5reader.py       # H5Reader — чтение HDF5 (массивы/атрибуты), одно соединение
 ├── common/fsprobe.py        # is_dir/is_file с таймаутом (не виснуть на мёртвой сетевой шаре)
 ├── common/settings.py       # настройки GUI (JSON): последние папки + история
+├── common/shell.py          # открытие файлов приложением по умолчанию (MP4 и т.п.)
 ├── common/wsl.py            # обнаружение WSL-дистрибутивов (UNC-корни)
 ├── utils.py                 # обёртки чтения HDF5, view2d/view_complex_2d, plot_polar_2d
 ├── integrate.py             # integrate_on_custom_grid() — интеграл перекрытия
