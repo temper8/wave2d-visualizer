@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -30,7 +31,7 @@ from src.wave2d.schema import MANIFEST, REPORT
 
 #: Версия формата/содержания сводки. Поднимать при изменениях
 #: :func:`format_run_info`/:func:`to_dict`; старый кэш тогда пересчитается.
-RUN_INFO_VERSION = 0.1
+RUN_INFO_VERSION = 0.2
 
 #: Имя файла кэша в ``derived/runs/<case>/<stamp>/``.
 RUN_INFO_CACHE_NAME = "run_info.yaml"
@@ -50,6 +51,8 @@ class RunInfo:
 
     run_id: str
     run_dir: Path
+    name: str | None = None
+    description: str | None = None
     format_version: Any = None
     error: str | None = None
     artifacts: list[ArtifactInfo] = field(default_factory=list)
@@ -89,6 +92,7 @@ def collect_run_info(nav: Wave2DNavigator, run_id: str) -> RunInfo:
     """
     info = RunInfo(run_id=run_id, run_dir=nav.run_dir(run_id))
     info.tasks = nav.tasks(run_id)
+    info.name, info.description = _read_work_meta(info.run_dir)
     artifacts = nav.run_artifacts(run_id)
     info.artifacts = [_artifact_info(p) for p in artifacts]
 
@@ -134,6 +138,12 @@ def collect_run_info(nav: Wave2DNavigator, run_id: str) -> RunInfo:
 def format_run_info(info: RunInfo) -> str:
     """Форматирует сводку в текст (те же строки, что показывает GUI)."""
     lines = [f"Run    : {info.run_id}", f"Path   : {info.run_dir}"]
+
+    if info.name:
+        lines.append(f"Name   : {info.name}")
+
+    if info.description:
+        lines.append(f"Desc   : {info.description}")
 
     if info.error is not None:
         lines.append(f"({info.error})")
@@ -223,6 +233,8 @@ def to_dict(info: RunInfo) -> dict[str, Any]:
         "run_info_version": RUN_INFO_VERSION,
         "run_id": info.run_id,
         "run_dir": str(info.run_dir),
+        "name": info.name,
+        "description": info.description,
         "format_version": (
             None if info.format_version is None else attr_text(info.format_version)
         ),
@@ -248,6 +260,8 @@ def from_dict(data: dict[str, Any]) -> RunInfo:
     return RunInfo(
         run_id=str(data.get("run_id", "")),
         run_dir=Path(data.get("run_dir", "")),
+        name=data.get("name"),
+        description=data.get("description"),
         format_version=data.get("format_version"),
         error=data.get("error"),
         artifacts=artifacts,
@@ -268,13 +282,35 @@ def _source_newer(
         cache_mtime = cache_path.stat().st_mtime
     except OSError:
         return True
-    for path in nav.run_artifacts(run_id):
+    sources = [*nav.run_artifacts(run_id), nav.run_dir(run_id) / "input.toml"]
+    for path in sources:
         try:
             if path.stat().st_mtime > cache_mtime:
                 return True
         except OSError:
             continue
     return False
+
+
+def _read_work_meta(run_dir: Path) -> tuple[str | None, str | None]:
+    """``name`` и ``description`` из секции ``[work]`` файла ``input.toml``.
+
+    ``None`` (без исключения), если файла нет, он битый или поля пусты.
+    """
+    try:
+        with open(run_dir / "input.toml", "rb") as f:
+            data = tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError):
+        return None, None
+    work = data.get("work")
+    if not isinstance(work, dict):
+        return None, None
+    name = work.get("name")
+    description = work.get("description")
+    return (
+        str(name) if name else None,
+        str(description) if description else None,
+    )
 
 
 def _artifact_info(path: Path) -> ArtifactInfo:
