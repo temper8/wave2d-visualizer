@@ -23,7 +23,7 @@ import numpy as np
 import imageio
 
 import tkinter as tk
-from tkinter import messagebox, simpledialog, ttk
+from tkinter import messagebox, ttk
 
 from src.common.h5reader import H5Reader
 from src.common.navigator import default_navigator
@@ -67,6 +67,45 @@ def _source_label(file_path: str) -> str:
     if len(parts) >= 4 and parts[2] == "tasks":
         label += f" [tasks/{parts[3]}]"
     return label
+
+
+class _AnimationProgress:
+    """Окно прогресса сборки анимации (без кнопки отмены).
+
+    Прогресс идёт по кадрам: заполнение ``ttk.Progressbar`` и подпись
+    ``Frame i/N``. Закрытие окна по крестику заблокировано — иначе writer
+    остался бы незакрытым.
+    """
+
+    def __init__(self, root: tk.Misc, title: str, total: int) -> None:
+        self._win = tk.Toplevel(root)
+        self._win.title(title)
+        self._win.transient(root)
+        self._win.resizable(False, False)
+        self._win.protocol("WM_DELETE_WINDOW", lambda: None)
+        self._label = ttk.Label(self._win, text="Rendering…", width=44, anchor="w")
+        self._label.pack(fill=tk.X, padx=12, pady=(12, 6))
+        self._bar = ttk.Progressbar(
+            self._win, mode="determinate", maximum=max(1, total), length=320,
+        )
+        self._bar.pack(fill=tk.X, padx=12, pady=(0, 12))
+        self._win.update_idletasks()
+        self._center(root)
+
+    def _center(self, root: tk.Misc) -> None:
+        x = root.winfo_rootx() + (root.winfo_width() - self._win.winfo_width()) // 2
+        y = root.winfo_rooty() + (root.winfo_height() - self._win.winfo_height()) // 2
+        self._win.geometry(f"+{max(x, 0)}+{max(y, 0)}")
+
+    def update(self, value: int, text: str) -> None:
+        """Обновляет заполнение и подпись (без ожидания событий)."""
+        self._bar["value"] = value
+        self._label.configure(text=text)
+        self._win.update_idletasks()
+
+    def close(self) -> None:
+        """Закрывает окно прогресса."""
+        self._win.destroy()
 
 
 class W2DViewer:
@@ -271,17 +310,81 @@ class W2DViewer:
 
     # --- анимация ---------------------------------------------------------
 
+    def _ask_animation_options(self) -> tuple[int, bool] | None:
+        """Диалог параметров анимации: ``fps`` и выравнивание шкалы цвета.
+
+        Возвращает ``(fps, align)`` или ``None`` при отмене. ``align=True`` —
+        фиксировать ``vmin/vmax`` по всему стеку (кадры не «мигают»),
+        ``align=False`` — автоподбор шкалы на каждом кадре.
+        """
+        result: dict[str, object] = {}
+        dlg = tk.Toplevel(self.root)
+        dlg.title("Animate")
+        dlg.transient(self.root)
+        dlg.resizable(False, False)
+
+        fps_var = tk.IntVar(value=10)
+        align_var = tk.BooleanVar(value=True)
+
+        body = ttk.Frame(dlg)
+        body.pack(fill=tk.X, padx=12, pady=(12, 6))
+        ttk.Label(body, text="Frames per second:").grid(
+            row=0, column=0, sticky="w"
+        )
+        ttk.Spinbox(
+            body, from_=1, to=60, textvariable=fps_var, width=6,
+        ).grid(row=0, column=1, sticky="w", padx=(8, 0))
+        ttk.Checkbutton(
+            body,
+            text="Align color scale (fixed vmin/vmax) across frames",
+            variable=align_var,
+        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(8, 0))
+
+        def accept() -> None:
+            try:
+                fps = int(fps_var.get())
+            except (tk.TclError, ValueError):
+                return
+            result["fps"] = min(max(fps, 1), 60)
+            result["align"] = bool(align_var.get())
+            dlg.destroy()
+
+        buttons = ttk.Frame(dlg)
+        buttons.pack(fill=tk.X, padx=12, pady=(0, 12))
+        ttk.Button(buttons, text="Animate", command=accept).pack(side=tk.LEFT)
+        ttk.Button(buttons, text="Cancel", command=dlg.destroy).pack(side=tk.RIGHT)
+
+        dlg.bind("<Return>", lambda _e: accept())
+        dlg.bind("<Escape>", lambda _e: dlg.destroy())
+        dlg.protocol("WM_DELETE_WINDOW", dlg.destroy)
+        dlg.grab_set()
+        dlg.update_idletasks()
+        x = self.root.winfo_rootx() + (
+            self.root.winfo_width() - dlg.winfo_width()
+        ) // 2
+        y = self.root.winfo_rooty() + (
+            self.root.winfo_height() - dlg.winfo_height()
+        ) // 2
+        dlg.geometry(f"+{max(x, 0)}+{max(y, 0)}")
+        self.root.wait_window(dlg)
+        if "fps" not in result:
+            return None
+        return int(result["fps"]), bool(result["align"])
+
     def _animate(self) -> None:
         """Собирает MP4, перебирая кадры по оси стека текущего среза.
 
         Анимируется ровно то, что видно: выбранный вид ``(R,Z)/(rho,theta)`` и
         составляющая ``real/imag/abs``, а также экватор ``Z=0`` (Ring/Flat),
-        если он включён. Шкала цвета фиксируется по всему стеку — иначе кадры
-        «мигают». Свип идёт по всей оси: моды ``nphi`` у merged или угол
-        ``phi`` у ``total_fields.hdf5``. Процесс идёт в главном потоке
-        (matplotlib не потокобезопасен), по кадру на ``after`` — окно остаётся
-        отзывчивым, а холст служит превью. Результат — ``MP4`` рядом с
-        исходным файлом, в подпапке ``animations/``.
+        если он включён. Параметры (``fps`` и выравнивание шкалы цвета
+        ``vmin/vmax`` по всему стеку либо автоподбор на каждом кадре)
+        спрашиваются в диалоге :meth:`_ask_animation_options`. Свип идёт по
+        всей оси: моды ``nphi`` у merged или угол ``phi`` у
+        ``total_fields.hdf5``. Процесс идёт в главном потоке (matplotlib не
+        потокобезопасен), по кадру на ``after``: окно остаётся отзывчивым,
+        холст служит превью, а ход сборки показывает окно
+        :class:`_AnimationProgress`. Результат — ``MP4`` рядом с исходным
+        файлом, в подпапке ``animations/``.
         """
         view = self.dataset_view
         if self._animating:
@@ -302,13 +405,10 @@ class W2DViewer:
                 parent=self.root,
             )
             return
-        fps = simpledialog.askinteger(
-            "Animate",
-            "Frames per second:",
-            parent=self.root, initialvalue=10, minvalue=1, maxvalue=60,
-        )
-        if fps is None:
+        options = self._ask_animation_options()
+        if options is None:
             return
+        fps, align = options
 
         source = Path(self.file_path)
         axis = selection.mode_name or "axis"
@@ -328,8 +428,12 @@ class W2DViewer:
 
         self._animating = True
         original_index = int(view.mode_var.get())
-        original_title = self.root.title()
-        view.set_color_limits(*view.animation_color_limits())
+        progress = _AnimationProgress(self.root, "Animate", length)
+        # Выравнивание шкалы цвета по всему стеку — иначе кадры «мигают».
+        if align:
+            view.set_color_limits(*view.animation_color_limits())
+        else:
+            view.set_color_limits(None, None)
 
         def finish(error: str | None = None) -> None:
             try:
@@ -340,7 +444,7 @@ class W2DViewer:
             view.set_color_limits(None, None)  # вернуть автоподбор шкалы
             view.mode_var.set(original_index)
             view.redraw()
-            self.root.title(original_title)
+            progress.close()
             if error is None:
                 messagebox.showinfo(
                     "Animate", f"Saved:\n{out}", parent=self.root
@@ -357,7 +461,7 @@ class W2DViewer:
             except Exception as e:  # noqa: BLE001
                 finish(str(e))
                 return
-            self.root.title(f"{original_title} — animating {index + 1}/{length}")
+            progress.update(index + 1, f"Frame {index + 1}/{length}")
             self.root.after(1, lambda: step(index + 1))
 
         self.root.after(1, lambda: step(0))
