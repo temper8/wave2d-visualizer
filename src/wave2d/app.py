@@ -6,10 +6,10 @@
 ``report.h5``). Список задач и проверка их файлов выполняются лениво —
 при раскрытии папки ``tasks`` и выборе конкретной задачи соответственно.
 Правая панель — вкладки :class:`~src.wave2d.reportview.ReportTabs`
-(``Summary``/``Tasks``/``Details``): прогон и его run-level файлы
-(``results.h5``/``report.h5``) показывают подробную сводку и таблицу задач,
-лист задачи — сведения о файле. Выбор **папки прогона** включает панель
-кнопок действий с прогоном. Кнопка (или двойной клик) открывает
+(``Summary``/``Tasks``/``Details``): папка прогона показывает короткую сводку,
+run-level файл (``report.h5``/``results.h5``) — подробную сводку с таблицей
+задач, лист задачи — сведения о файле. Выбор **папки прогона** включает
+панель кнопок действий с прогоном. Кнопка (или двойной клик) открывает
 :class:`~src.wave2d.viewer.W2DViewer` в отдельном окне ``Toplevel``.
 
 Кнопка **«Слияние (nphi)»** (активна, когда у прогона ≥ 2 задачи-моды)
@@ -532,11 +532,11 @@ class W2DNavigatorApp:
                 f"Task file missing:\n{self._task_files.get(iid)}"
             )
         elif run_id is not None:
-            self._show_run_info(run_id)
+            self._show_run_info(run_id, detailed=False)
         elif iid is not None and iid in self._folders:
             # Папка ``tasks``: показываем сводку прогона, но выбором прогона
             # не считается (иначе производные узлы цеплялись бы к папке).
-            self._show_run_info(self._folders[iid])
+            self._show_run_info(self._folders[iid], detailed=False)
         else:
             # Выбрана папка кейса или ничего — правая панель пуста.
             self._set_info("")
@@ -764,13 +764,14 @@ class W2DNavigatorApp:
         ):
             self._open_viewer(path)
 
-    def _show_run_info(self, run_id: str) -> None:
-        """Вкладки ``Summary``/``Tasks`` по прогону (артефакты, статусы, сборка).
+    def _show_run_info(self, run_id: str, *, detailed: bool = True) -> None:
+        """Вкладка ``Summary`` по прогону (артефакты, статусы, сборка).
 
-        Сбор/форматирование вынесены в :mod:`src.wave2d.run_info`
-        (tkinter-независимы) — здесь только обновление панели.
+        ``detailed=True`` — run-level файл: подробная сводка плюс вкладка
+        ``Tasks``. ``detailed=False`` (папка прогона) — короткая сводка без
+        таблицы задач. Сбор/форматирование вынесены в :mod:`src.wave2d.run_info`.
         """
-        self.report.show_run(collect_run_info(self.nav, run_id))
+        self.report.show_run(collect_run_info(self.nav, run_id), detailed=detailed)
 
     def _show_file_info(self, path: Path) -> None:
         if not fsprobe.is_file(path):

@@ -182,8 +182,13 @@ def collect_run_info(nav: Wave2DNavigator, run_id: str) -> RunInfo:
     return info
 
 
-def format_run_info(info: RunInfo) -> str:
-    """Форматирует сводку в текст (те же строки, что показывает GUI)."""
+def format_run_info(info: RunInfo, *, detailed: bool = True) -> str:
+    """Форматирует сводку в текст.
+
+    ``detailed=True`` (по умолчанию) — подробная сводка для run-level файла:
+    секции ``Toolchain``/``Build details``/``System info`` и суммарное время
+    задач. ``detailed=False`` — короткая сводка (папка прогона).
+    """
     lines = [f"Run    : {info.run_id}", f"Path   : {info.run_dir}"]
 
     if info.name:
@@ -213,11 +218,12 @@ def format_run_info(info: RunInfo) -> str:
         ok = sum(1 for s in info.statuses if attr_text(s) == "SUCCESS")
         lines.append(f"Status : {ok}/{len(info.statuses)} SUCCESS")
 
-    if info.wall_time_sec is not None or info.sum_tasks_time_sec is not None:
+    show_sum = detailed and info.sum_tasks_time_sec is not None
+    if info.wall_time_sec is not None or show_sum:
         parts: list[str] = []
         if info.wall_time_sec is not None:
             parts.append(f"wall {info.wall_time_sec:.2f} s")
-        if info.sum_tasks_time_sec is not None:
+        if show_sum:
             parts.append(f"sum tasks {info.sum_tasks_time_sec:.2f} s")
         lines.append("Time   : " + ", ".join(parts))
 
@@ -230,10 +236,11 @@ def format_run_info(info: RunInfo) -> str:
     if info.contains is not None:
         lines.append(f"Contains: {', '.join(info.contains)}")
 
-    details = _format_details(info)
-    if details:
-        lines.append("")
-        lines.extend(details)
+    if detailed:
+        details = _format_details(info)
+        if details:
+            lines.append("")
+            lines.extend(details)
 
     return "\n".join(lines)
 

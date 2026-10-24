@@ -50,10 +50,15 @@ class ReportTabs(ttk.Notebook):
 
     # --- публичный интерфейс -------------------------------------------
 
-    def show_run(self, info: RunInfo) -> None:
-        """Показывает сводку и таблицу задач прогона, выбирает вкладку ``Summary``."""
-        _set_text(self.summary, format_run_info(info))
-        self._fill_tasks(info.task_details)
+    def show_run(self, info: RunInfo, *, detailed: bool = True) -> None:
+        """Показывает сводку прогона и выбирает вкладку ``Summary``.
+
+        ``detailed=True`` (run-level файл, напр. ``report.h5``) — подробная
+        сводка плюс таблица задач. ``detailed=False`` (папка прогона) —
+        короткая сводка, таблица задач пуста.
+        """
+        _set_text(self.summary, format_run_info(info, detailed=detailed))
+        self._fill_tasks(info.task_details if detailed else [])
         self.select(self._summary_frame)
 
     def show_details(self, text: str) -> None:
