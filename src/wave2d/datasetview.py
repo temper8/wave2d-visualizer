@@ -705,6 +705,35 @@ class DatasetView(ttk.Frame):
         rgba = np.asarray(self.canvas.buffer_rgba())
         return np.ascontiguousarray(rgba[..., :3])
 
+    def animation_tokens(self) -> list[str]:
+        """Токены имени файла анимации: поле, ось и включённые переключатели.
+
+        Имя поля берётся как в файле (``Ex``, ``Ea``, …). Умолчательные
+        состояния не пишутся: вид ``rho`` и выключенный экватор опускаются,
+        составляющая — только для комплексных полей. Токен ``scale_*``
+        добавляет viewer (он знает выбор в диалоге Animate).
+        """
+        selection = self.stacked_selection()
+        if selection is None:
+            return []
+        field = (selection.path or "").rsplit("/", 1)[-1] or "field"
+        tokens = [field, selection.mode_name or "axis"]
+        if np.iscomplexobj(selection.data):
+            tokens.append(self.comp_var.get())
+        if self.view_var.get() == "rz":
+            tokens.append("rz")
+        if self._equator_active(selection):
+            tokens.append(f"eq-{self.equator_view_var.get()}")
+            if self.fill_var.get():
+                tokens.append("fill")
+        return tokens
+
+    def _equator_active(self, selection: Selection) -> bool:
+        """Включён ли экватор и есть ли для него данные (иначе не рисуется)."""
+        return self._equator_var(selection).get() and self._equatorial_ready(
+            selection
+        )
+
     def _draw_stacked(self) -> None:
         """Рисует срез стека по моде: 2D-карту поля или 1D-профиль."""
         selection = self._selections[0]

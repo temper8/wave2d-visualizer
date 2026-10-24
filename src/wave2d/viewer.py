@@ -69,6 +69,21 @@ def _source_label(file_path: str) -> str:
     return label
 
 
+def _unique_path(path: Path) -> Path:
+    """Путь без перезаписи: ``name__2.mp4``, ``name__3.mp4``, …
+
+    Существующее имя не трогается — рядом добавляется суффикс ``__N``.
+    """
+    if not path.exists():
+        return path
+    n = 2
+    while True:
+        candidate = path.with_name(f"{path.stem}__{n}{path.suffix}")
+        if not candidate.exists():
+            return candidate
+        n += 1
+
+
 class _AnimationProgress:
     """Окно прогресса сборки анимации (без кнопки отмены).
 
@@ -383,8 +398,11 @@ class W2DViewer:
         ``total_fields.hdf5``. Процесс идёт в главном потоке (matplotlib не
         потокобезопасен), по кадру на ``after``: окно остаётся отзывчивым,
         холст служит превью, а ход сборки показывает окно
-        :class:`_AnimationProgress`. Результат — ``MP4`` рядом с исходным
-        файлом, в подпапке ``animations/``.
+        :class:`_AnimationProgress`. Имя файла собирается из поля и включённых
+        переключателей (:meth:`DatasetView.animation_tokens`) плюс
+        ``scale_auto``/``scale_fixed``; при совпадении добавляется ``__2``,
+        ``__3``. Результат — ``MP4`` рядом с исходным файлом, в подпапке
+        ``animations/``.
         """
         view = self.dataset_view
         if self._animating:
@@ -411,8 +429,10 @@ class W2DViewer:
         fps, align = options
 
         source = Path(self.file_path)
-        axis = selection.mode_name or "axis"
-        out = source.parent / "animations" / f"{source.stem}__{axis}.mp4"
+        tokens = [*view.animation_tokens(), "scale_fixed" if align else "scale_auto"]
+        out = _unique_path(
+            source.parent / "animations" / f"{'__'.join(tokens)}.mp4"
+        )
         try:
             out.parent.mkdir(parents=True, exist_ok=True)
             writer = imageio.get_writer(
