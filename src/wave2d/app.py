@@ -49,6 +49,7 @@ from src.common.settings import (
 from src.common.wsl import wsl_roots
 from src.wave2d.merge import merge_nphi_tasks, nphi_tasks
 from src.wave2d.total_field import total_field_pol_xs, write_total_fields
+from src.wave2d.run_info import collect_run_info, format_run_info, shallow_attrs
 from src.wave2d.schema import (
     MANIFEST,
     REPORT,
@@ -752,143 +753,10 @@ class W2DNavigatorApp:
     def _show_run_info(self, run_id: str) -> None:
         """Краткая сводка по прогону: артефакты, задачи, статусы, сборка.
 
-        Данные берутся из run-level артефакта (``report.h5`` >= 0.96 или
-        ``results.h5`` <= 0.95: ``/report`` либо ``/manifest``) и из ФС
-        (задачи, содержимое папки). Любые ошибки чтения не ломают панель.
+        Чтение и форматирование вынесены в :mod:`src.wave2d.run_info`
+        (tkinter-независимы) — здесь только обновление панели.
         """
-        run_dir = self.nav.run_dir(run_id)
-        artifacts = self.nav.run_artifacts(run_id)
-        tasks = self.nav.tasks(run_id)
-
-        lines = [f"Run    : {run_id}", f"Path   : {run_dir}"]
-
-        report: dict[str, dict] = {}
-        version = None
-        if artifacts:
-            try:
-                with H5Reader(artifacts[0]) as reader:
-                    version = reader.attrs("/").get("format_version")
-                    prov = next(
-                        (p for p in (REPORT, MANIFEST) if reader.contains(p)),
-                        None,
-                    )
-                    if prov is not None:
-                        report = self._shallow_attrs(reader, prov)
-            except Exception as e:  # noqa: BLE001
-                lines.append(f"(failed to read {artifacts[0].name}: {e})")
-
-        if version is not None:
-            lines.append(f"Format : {self._text(version)}")
-
-        if artifacts:
-            parts: list[str] = []
-            for p in artifacts:
-                try:
-                    parts.append(f"{p.name} ({p.stat().st_size / 1e6:.2f} MB)")
-                except OSError:
-                    parts.append(p.name)
-            lines.append("File   : " + ", ".join(parts))
-        else:
-            lines.append("File   : no run-level file")
-
-        lines.append(f"Tasks  : {self._task_summary(tasks)}")
-
-        # Статусы задач: ключи ``/report/<task>`` со своим атрибутом status.
-        task_set = set(tasks)
-        statuses = [
-            attrs["status"]
-            for key, attrs in report.items()
-            if key in task_set and "status" in attrs
-        ]
-        if statuses:
-            ok = sum(1 for s in statuses if self._text(s) == "SUCCESS")
-            lines.append(f"Status : {ok}/{len(statuses)} SUCCESS")
-
-        wall = report.get(REPORT, {}).get("wall_time_sec")
-        if wall is not None:
-            lines.append(f"Time   : wall {float(wall):.2f} s")
-
-        # Сборка: 0.96 — /report/build, 0.94 — /manifest/toolchain.
-        build = report.get("build") or report.get("toolchain") or {}
-        if build:
-            commit = self._text(build.get("git_commit", ""))[:7]
-            if self._text(build.get("git_dirty", "")) in ("True", "dirty"):
-                commit += "*"
-            branch = self._text(build.get("git_branch", "?"))
-            compiler = self._text(
-                build.get("compiler") or build.get("compiler_ver") or "?"
-            )
-            hdf5 = build.get("hdf5") or build.get("hdf5_ver")
-            suffix = f", hdf5 {self._text(hdf5)}" if hdf5 is not None else ""
-            lines.append(f"Build  : {branch}@{commit} ({compiler}{suffix})")
-
-        system = report.get("system_info") or report.get("system") or {}
-        if system:
-            host = self._text(system.get("host") or system.get("hostname") or "?")
-            sysname = self._text(system.get("system", "?"))
-            lines.append(f"System : {host} — {sysname}")
-
-        try:
-            names = ", ".join(sorted(p.name for p in run_dir.iterdir()))
-            lines.append(f"Contains: {names}")
-        except OSError:
-            pass
-
-        self._set_info("\n".join(lines))
-
-    @staticmethod
-    def _shallow_attrs(reader: H5Reader, root: str) -> dict[str, dict]:
-        """Атрибуты ``root`` и его прямых детей (без глубокого обхода).
-
-        :meth:`H5Reader.attrs_recursive` обходит всё поддерево ``/report`` —
-        у прогона с 245 задачами это ~1200 объектов и ~7000 атрибутов, а на
-        сетевой шаре ~1.5 с на каждый клик. Для сводки нужны лишь статусы
-        задач и ``build``/``system_info`` — это прямые дети ``/report``.
-        """
-        result: dict[str, dict] = {}
-        if root not in reader.file:
-            return result
-        result[root] = reader.attrs(root)
-        for key in reader.keys(root):
-            try:
-                result[key] = reader.attrs(f"{root}/{key}")
-            except (KeyError, OSError):
-                continue
-        return result
-
-    def _task_summary(self, tasks: list[str]) -> str:
-        """Краткое описание задач: ``5 (nphi -122…+122)`` или просто число."""
-        if not tasks:
-            return "none"
-        rng = self._axis_range(tasks)
-        return f"{len(tasks)} ({rng})" if rng else str(len(tasks))
-
-    @staticmethod
-    def _axis_range(tasks: list[str]) -> str | None:
-        """Диапазон ``<ось>±NNN`` по именам задач; ``None`` — имена не такие."""
-        axis = ""
-        values: list[int] = []
-        for name in tasks:
-            pos = name.find("+")
-            idx = pos if pos > 0 else name.find("-")
-            if idx <= 0:
-                return None
-            try:
-                values.append(int(name[idx:]))
-            except ValueError:
-                return None
-            if not axis:
-                axis = name[:idx]
-            elif axis != name[:idx]:
-                return None
-        return f"{axis} {min(values)}…{max(values)}" if values else None
-
-    @staticmethod
-    def _text(value: object) -> str:
-        """Приводит значение атрибута HDF5 к строке (``bytes`` → utf-8)."""
-        if isinstance(value, bytes):
-            return value.decode("utf-8", "replace")
-        return str(value)
+        self._set_info(format_run_info(collect_run_info(self.nav, run_id)))
 
     def _show_file_info(self, path: Path) -> None:
         if not fsprobe.is_file(path):
@@ -904,7 +772,7 @@ class W2DNavigatorApp:
                     None,
                 )
                 if provenance is not None:
-                    manifest = self._shallow_attrs(reader, provenance)
+                    manifest = shallow_attrs(reader, provenance)
                     if manifest:
                         lines.append(f"{provenance.strip('/')}:")
                         lines.extend(self._format_params(manifest, provenance))
