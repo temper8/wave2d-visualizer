@@ -4,9 +4,11 @@
 :class:`~src.common.navigator.Wave2DNavigator` (кейсы → прогоны → папка
 ``tasks`` → задачи), в листьях — реальные HDF5-файлы (``results.h5``,
 ``report.h5``). Список задач и проверка их файлов выполняются лениво —
-при раскрытии папки ``tasks`` и выборе конкретной задачи соответственно. Выбор листа
-показывает сводку ``report``/``input``; выбор **папки прогона** — краткую
-сводку по прогону (артефакты, задачи, статусы, сборка) и включает панель
+при раскрытии папки ``tasks`` и выборе конкретной задачи соответственно.
+Правая панель — вкладки :class:`~src.wave2d.reportview.ReportTabs`
+(``Summary``/``Tasks``/``Details``): прогон и его run-level файлы
+(``results.h5``/``report.h5``) показывают подробную сводку и таблицу задач,
+лист задачи — сведения о файле. Выбор **папки прогона** включает панель
 кнопок действий с прогоном. Кнопка (или двойной клик) открывает
 :class:`~src.wave2d.viewer.W2DViewer` в отдельном окне ``Toplevel``.
 
@@ -49,7 +51,8 @@ from src.common.settings import (
 from src.common.wsl import wsl_roots
 from src.wave2d.merge import merge_nphi_tasks, nphi_tasks
 from src.wave2d.total_field import total_field_pol_xs, write_total_fields
-from src.wave2d.run_info import get_run_info_text, shallow_attrs
+from src.wave2d.reportview import ReportTabs
+from src.wave2d.run_info import collect_run_info, shallow_attrs
 from src.wave2d.schema import (
     MANIFEST,
     REPORT,
@@ -77,6 +80,9 @@ class W2DNavigatorApp:
 
         self._paths: dict[str, Path] = {}  # iid узла -> путь к HDF5-файлу
         self._runs: dict[str, str] = {}  # iid узла-прогона -> run_id
+        # iid run-level файла (results.h5/report.h5) -> run_id: клик по файлу
+        # показывает вкладки сводки/задач, а не дамп атрибутов.
+        self._file_runs: dict[str, str] = {}
         # iid узлов, чьи дети (задачи) уже достроены (ленивое раскрытие).
         self._loaded: set[str] = set()
         # iid узла-папки ``tasks`` -> run_id.
@@ -266,13 +272,10 @@ class W2DNavigatorApp:
         self.tree.bind("<Double-1>", self.on_double)
         self.tree.bind("<<TreeviewOpen>>", self.on_open)
 
-        # --- инфо-панель ---
+        # --- инфо-панель: вкладки Summary / Tasks / Details ---
         right = ttk.Frame(paned)
-        self.info = tk.Text(right, wrap="none", state="disabled")
-        info_sb = ttk.Scrollbar(right, orient="vertical", command=self.info.yview)
-        self.info.configure(yscrollcommand=info_sb.set)
-        self.info.grid(row=0, column=0, sticky="nsew")
-        info_sb.grid(row=0, column=1, sticky="ns")
+        self.report = ReportTabs(right)
+        self.report.grid(row=0, column=0, columnspan=2, sticky="nsew")
         right.rowconfigure(0, weight=1)
         right.columnconfigure(0, weight=1)
 
@@ -403,7 +406,7 @@ class W2DNavigatorApp:
     def _add_run_artifacts(self, parent: str, run_id: str) -> None:
         """Добавляет run-level файлы прогона: ``results.h5`` и/или ``report.h5``."""
         for path in self.nav.run_artifacts(run_id):
-            self._add_results_node(parent, path)
+            self._add_results_node(parent, path, run_id)
 
     def _add_derived_node(self, parent: str, run_id: str) -> None:
         """Добавляет производные артефакты прогона (merged и total_fields)."""
@@ -472,7 +475,10 @@ class W2DNavigatorApp:
         else:
             self._missing.add(node)
 
-    def _add_results_node(self, parent: str, path: Path) -> None:
+    def _add_results_node(
+        self, parent: str, path: Path, run_id: str | None = None
+    ) -> None:
+        """Добавляет узел-файл; ``run_id`` — если файл run-level (вкладки сводки)."""
         if not path.is_file():
             return
         iid = f"file::{path}"
@@ -480,12 +486,15 @@ class W2DNavigatorApp:
             return
         self.tree.insert(parent, "end", iid=iid, text=path.name)
         self._paths[iid] = path
+        if run_id is not None:
+            self._file_runs[iid] = run_id
 
     def _clear_tree(self, info: str) -> None:
         """Очищает дерево и инфо-панель, сбрасывая выбор."""
         self.tree.delete(*self.tree.get_children())
         self._paths.clear()
         self._runs.clear()
+        self._file_runs.clear()
         self._loaded.clear()
         self._folders.clear()
         self._task_files.clear()
@@ -495,6 +504,7 @@ class W2DNavigatorApp:
         self.selected_run_node = None
         self.open_btn.configure(state="disabled")
         self._refresh_run_actions()
+        self.report.clear()
         self._set_info(info)
 
     # --- обработчики -----------------------------------------------------
@@ -512,7 +522,11 @@ class W2DNavigatorApp:
         self.open_btn.configure(state="normal" if path else "disabled")
         self._refresh_run_actions()
         if path is not None:
-            self._show_file_info(path)
+            file_run = self._file_runs.get(iid) if iid else None
+            if file_run is not None:
+                self._show_run_info(file_run)
+            else:
+                self._show_file_info(path)
         elif iid is not None and iid in self._missing:
             self._set_info(
                 f"Task file missing:\n{self._task_files.get(iid)}"
@@ -751,12 +765,12 @@ class W2DNavigatorApp:
             self._open_viewer(path)
 
     def _show_run_info(self, run_id: str) -> None:
-        """Краткая сводка по прогону: артефакты, задачи, статусы, сборка.
+        """Вкладки ``Summary``/``Tasks`` по прогону (артефакты, статусы, сборка).
 
-        Чтение, кэш и форматирование вынесены в :mod:`src.wave2d.run_info`
+        Сбор/форматирование вынесены в :mod:`src.wave2d.run_info`
         (tkinter-независимы) — здесь только обновление панели.
         """
-        self._set_info(get_run_info_text(self.nav, run_id))
+        self.report.show_run(collect_run_info(self.nav, run_id))
 
     def _show_file_info(self, path: Path) -> None:
         if not fsprobe.is_file(path):
@@ -794,7 +808,5 @@ class W2DNavigatorApp:
         return lines
 
     def _set_info(self, text: str) -> None:
-        self.info.configure(state="normal")
-        self.info.delete("1.0", tk.END)
-        self.info.insert("1.0", text)
-        self.info.configure(state="disabled")
+        """Пишет текст на вкладку ``Details`` (логи, сведения о файле)."""
+        self.report.show_details(text)

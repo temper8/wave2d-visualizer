@@ -1,9 +1,10 @@
 """Сводка по прогону Wave2D: чтение, кэш и форматирование.
 
 Модуль не зависит от tkinter, поэтому сводку можно вызывать из CLI и
-тестировать без GUI. GUI-навигатор (:mod:`src.wave2d.app`) использует
-:func:`get_run_info_text`: она берёт готовую сводку из кэша
-``derived/runs/<case>/<stamp>/run_info.yaml`` либо считает заново.
+тестировать без GUI. GUI-навигатор (:mod:`src.wave2d.app`) строит вкладки
+``Summary``/``Tasks`` прямо по :func:`collect_run_info`. Кэш
+(:func:`get_run_info_text` → ``derived/runs/<case>/<stamp>/run_info.yaml``)
+в GUI пока не задействован.
 
 Источники: run-level артефакт (``report.h5`` >= 0.96 или ``results.h5``
 <= 0.95: группа ``/report`` либо ``/manifest``) и файловая система (список
@@ -19,7 +20,7 @@ from __future__ import annotations
 
 import re
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -32,10 +33,28 @@ from src.wave2d.schema import MANIFEST, REPORT
 
 #: Версия формата/содержания сводки. Поднимать при изменениях
 #: :func:`format_run_info`/:func:`to_dict`; старый кэш тогда пересчитается.
-RUN_INFO_VERSION = 0.2
+RUN_INFO_VERSION = 0.3
 
 #: Имя файла кэша в ``derived/runs/<case>/<stamp>/``.
 RUN_INFO_CACHE_NAME = "run_info.yaml"
+
+#: Ключи сборки, уже показанные в однострочном ``Build``/секции ``Toolchain``.
+_BUILD_ONE_LINER_KEYS = frozenset(
+    {
+        "compiler",
+        "compiler_version",
+        "compiler_ver",
+        "compiler_opt",
+        "git_branch",
+        "git_commit",
+        "git_dirty",
+        "hdf5",
+        "hdf5_ver",
+    }
+)
+
+#: Ключи окружения, уже показанные в однострочном ``System``.
+_SYSTEM_ONE_LINER_KEYS = frozenset({"host", "hostname", "system"})
 
 
 @dataclass
@@ -44,6 +63,24 @@ class ArtifactInfo:
 
     name: str
     size_mb: float | None = None
+
+
+@dataclass
+class TaskInfo:
+    """Строка отчёта по задаче (вкладка ``Tasks`` навигатора).
+
+    Все поля необязательны: заполняются из прямых атрибутов ``/report/<task>``
+    (``status``, ``node``, ``start_time``, ``total_time_sec``, ``exit_code``,
+    ``slurm_job_id``), без обхода поддерева задачи.
+    """
+
+    name: str
+    status: str | None = None
+    node: str | None = None
+    started: str | None = None
+    total_time_sec: float | None = None
+    exit_code: int | None = None
+    slurm_job_id: str | None = None
 
 
 @dataclass
@@ -60,8 +97,11 @@ class RunInfo:
     tasks: list[str] = field(default_factory=list)
     statuses: list[str] = field(default_factory=list)
     wall_time_sec: float | None = None
+    sum_tasks_time_sec: float | None = None
     build: dict[str, Any] = field(default_factory=dict)
+    toolchain: dict[str, Any] = field(default_factory=dict)
     system: dict[str, Any] = field(default_factory=dict)
+    task_details: list[TaskInfo] = field(default_factory=list)
     contains: list[str] | None = None
 
 
@@ -119,13 +159,19 @@ def collect_run_info(nav: Wave2DNavigator, run_id: str) -> RunInfo:
         for key, attrs in report.items()
         if key in task_set and "status" in attrs
     ]
+    info.task_details = _collect_task_details(report, info.tasks)
 
-    wall = report.get(REPORT, {}).get("wall_time_sec")
+    run_attrs = report.get(REPORT) or report.get(MANIFEST) or {}
+    wall = run_attrs.get("wall_time_sec")
     if wall is not None:
         info.wall_time_sec = float(wall)
+    sum_tasks = run_attrs.get("sum_tasks_time_sec")
+    if sum_tasks is not None:
+        info.sum_tasks_time_sec = _as_float(sum_tasks)
 
-    # Сборка: 0.96 — /report/build, 0.94 — /manifest/toolchain.
+    # Сборка: 0.96 — /report/build + /report/toolchain, 0.94 — /manifest/toolchain.
     info.build = report.get("build") or report.get("toolchain") or {}
+    info.toolchain = report.get("toolchain") or {}
     info.system = report.get("system_info") or report.get("system") or {}
 
     try:
@@ -167,8 +213,13 @@ def format_run_info(info: RunInfo) -> str:
         ok = sum(1 for s in info.statuses if attr_text(s) == "SUCCESS")
         lines.append(f"Status : {ok}/{len(info.statuses)} SUCCESS")
 
-    if info.wall_time_sec is not None:
-        lines.append(f"Time   : wall {info.wall_time_sec:.2f} s")
+    if info.wall_time_sec is not None or info.sum_tasks_time_sec is not None:
+        parts: list[str] = []
+        if info.wall_time_sec is not None:
+            parts.append(f"wall {info.wall_time_sec:.2f} s")
+        if info.sum_tasks_time_sec is not None:
+            parts.append(f"sum tasks {info.sum_tasks_time_sec:.2f} s")
+        lines.append("Time   : " + ", ".join(parts))
 
     if info.build:
         lines.append(f"Build  : {_format_build(info.build)}")
@@ -178,6 +229,11 @@ def format_run_info(info: RunInfo) -> str:
 
     if info.contains is not None:
         lines.append(f"Contains: {', '.join(info.contains)}")
+
+    details = _format_details(info)
+    if details:
+        lines.append("")
+        lines.extend(details)
 
     return "\n".join(lines)
 
@@ -246,8 +302,11 @@ def to_dict(info: RunInfo) -> dict[str, Any]:
         "tasks": list(info.tasks),
         "statuses": list(info.statuses),
         "wall_time_sec": info.wall_time_sec,
+        "sum_tasks_time_sec": info.sum_tasks_time_sec,
         "build": _sanitize(info.build),
+        "toolchain": _sanitize(info.toolchain),
         "system": _sanitize(info.system),
+        "task_details": [asdict(t) for t in info.task_details],
         "contains": None if info.contains is None else list(info.contains),
     }
 
@@ -269,8 +328,22 @@ def from_dict(data: dict[str, Any]) -> RunInfo:
         tasks=list(data.get("tasks") or []),
         statuses=list(data.get("statuses") or []),
         wall_time_sec=data.get("wall_time_sec"),
+        sum_tasks_time_sec=data.get("sum_tasks_time_sec"),
         build=dict(data.get("build") or {}),
+        toolchain=dict(data.get("toolchain") or {}),
         system=dict(data.get("system") or {}),
+        task_details=[
+            TaskInfo(
+                name=str(t.get("name", "")),
+                status=t.get("status"),
+                node=t.get("node"),
+                started=t.get("started"),
+                total_time_sec=t.get("total_time_sec"),
+                exit_code=t.get("exit_code"),
+                slurm_job_id=t.get("slurm_job_id"),
+            )
+            for t in data.get("task_details") or []
+        ],
         contains=None if data.get("contains") is None else list(data["contains"]),
     )
 
@@ -338,6 +411,55 @@ def _sanitize(value: Any) -> Any:
     return attr_text(value)
 
 
+def _collect_task_details(
+    report: dict[str, dict[str, Any]], tasks: list[str]
+) -> list[TaskInfo]:
+    """Строки отчёта по задачам из прямых детей ``/report`` (без доп. чтений).
+
+    Порядок задач сохраняется как в :attr:`RunInfo.tasks` (обычно по ``nphi``).
+    """
+    details: list[TaskInfo] = []
+    for name in tasks:
+        attrs = report.get(name)
+        if not attrs:
+            continue
+        details.append(
+            TaskInfo(
+                name=_opt_text(attrs.get("task_name")) or name,
+                status=_opt_text(attrs.get("status")),
+                node=_opt_text(attrs.get("node")),
+                started=_opt_text(attrs.get("start_time")),
+                total_time_sec=_as_float(attrs.get("total_time_sec")),
+                exit_code=_as_int(attrs.get("exit_code")),
+                slurm_job_id=_opt_text(attrs.get("slurm_job_id")),
+            )
+        )
+    return details
+
+
+def _opt_text(value: object) -> str | None:
+    """Строка атрибута или ``None`` для пустого/отсутствующего значения."""
+    if value is None:
+        return None
+    return attr_text(value) or None
+
+
+def _as_float(value: object) -> float | None:
+    """``float`` из атрибута HDF5; ``None``, если не число."""
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_int(value: object) -> int | None:
+    """``int`` из атрибута HDF5; ``None``, если не число."""
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
 # --- общие хелперы ------------------------------------------------------
 
 
@@ -359,6 +481,34 @@ def shallow_attrs(reader: H5Reader, root: str) -> dict[str, dict]:
         except (KeyError, OSError):
             continue
     return result
+
+
+def _format_details(info: RunInfo) -> list[str]:
+    """Доп. секции сводки: ``Toolchain``, ``Build details``, ``System info``.
+
+    Ключи, уже попавшие в однострочные ``Build``/``System``, в секциях не
+    повторяются. Пустые секции пропускаются.
+    """
+    sections = (
+        ("Toolchain", info.toolchain),
+        ("Build details", _without(info.build, _BUILD_ONE_LINER_KEYS)),
+        ("System info", _without(info.system, _SYSTEM_ONE_LINER_KEYS)),
+    )
+    lines: list[str] = []
+    for title, data in sections:
+        if not data:
+            continue
+        if lines:
+            lines.append("")
+        lines.append(f"{title}:")
+        for key in sorted(data):
+            lines.append(f"  {key} = {attr_text(data[key])}")
+    return lines
+
+
+def _without(data: dict[str, Any], keys: frozenset[str]) -> dict[str, Any]:
+    """Копия ``data`` без ключей ``keys``."""
+    return {k: v for k, v in data.items() if k not in keys}
 
 
 def attr_text(value: object) -> str:
