@@ -51,9 +51,13 @@ class ReportTabs(ttk.Notebook):
 
     # --- публичный интерфейс -------------------------------------------
 
-    def show_run(self, info: RunInfo) -> None:
-        """Показывает подробную сводку и таблицу задач, выбирает ``Summary``."""
-        _set_text(self.summary, format_run_info(info))
+    def show_run(self, info: RunInfo, *, header: bool = True) -> None:
+        """Показывает подробную сводку и таблицу задач, выбирает ``Summary``.
+
+        ``header=False`` — без строк ``Name``/``Desc``: их показывает
+        внешняя шапка :class:`~src.wave2d.runheader.RunHeader`.
+        """
+        _set_text(self.summary, format_run_info(info, header=header))
         self._fill_tasks(info.task_details)
         self.select(self._summary_frame)
 

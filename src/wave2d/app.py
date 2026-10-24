@@ -13,6 +13,11 @@
 панель кнопок действий с прогоном. Кнопка (или двойной клик) открывает
 :class:`~src.wave2d.viewer.W2DViewer` в отдельном окне ``Toplevel``.
 
+Над правой панелью — общая шапка прогона (:class:`~src.wave2d.runheader.RunHeader`):
+имя и описание из ``input.toml``. Она видна на всех листах прогона (папка,
+``tasks``, run-level файл, файлы задач и производные), поэтому ``Name``/``Desc``
+не дублируются в теле сводки (``format_run_info(header=False)``).
+
 Кнопка **«Слияние (nphi)»** (активна, когда у прогона ≥ 2 задачи-моды)
 в фоне собирает задачи в 3D-стек по оси `nphi` —
 ``derived/runs/<case>/<stamp>/nphi_merged.h5``
@@ -53,7 +58,13 @@ from src.common.wsl import wsl_roots
 from src.wave2d.merge import merge_nphi_tasks, nphi_tasks
 from src.wave2d.total_field import total_field_pol_xs, write_total_fields
 from src.wave2d.reportview import ReportTabs
-from src.wave2d.run_info import collect_run_info, format_run_info, shallow_attrs
+from src.wave2d.run_info import (
+    collect_run_info,
+    format_run_info,
+    read_work_meta,
+    shallow_attrs,
+)
+from src.wave2d.runheader import RunHeader
 from src.wave2d.schema import (
     MANIFEST,
     REPORT,
@@ -65,6 +76,11 @@ from src.wave2d.viewer import W2DViewer
 
 # Иконка окна — единый PNG рядом с модулем (генератор: tools/make_icon.py).
 _ICON_PATH = Path(__file__).resolve().parent / "assets" / "w2d_app_icon.png"
+
+#: Горизонтальный отступ элементов правой панели (шапка, сводка, вкладки,
+#: кнопки) — единый, чтобы текст шапки и тела выравнивался по левому краю.
+#: Согласован с ``_PAD_X`` в :mod:`src.wave2d.runheader`.
+_PANEL_PAD = 4
 
 # Кнопки-заглушки панели действий с прогоном (команды появятся позже).
 # «Рендер полей» реализована отдельно — см. :meth:`W2DNavigatorApp.render_fields`.
@@ -84,6 +100,9 @@ class W2DNavigatorApp:
         # iid run-level файла (results.h5/report.h5) -> run_id: клик по файлу
         # показывает вкладки сводки/задач, а не дамп атрибутов.
         self._file_runs: dict[str, str] = {}
+        # iid любого узла, привязанного к прогону (узел прогона, задачи,
+        # run-level и производные файлы, папка tasks) -> run_id: для шапки.
+        self._node_run: dict[str, str] = {}
         # iid узлов, чьи дети (задачи) уже достроены (ленивое раскрытие).
         self._loaded: set[str] = set()
         # iid узла-папки ``tasks`` -> run_id.
@@ -273,8 +292,13 @@ class W2DNavigatorApp:
         self.tree.bind("<Double-1>", self.on_double)
         self.tree.bind("<<TreeviewOpen>>", self.on_open)
 
-        # --- инфо-панель: обычный текст; вкладки — только для run-level файла ---
+        # --- шапка прогона: имя/описание над всеми «листами» правой панели ---
         right = ttk.Frame(paned)
+        self.header = RunHeader(right)
+        self.header.grid(row=0, column=0, columnspan=2, sticky="ew")
+        self.header.grid_remove()
+
+        # --- инфо-панель: обычный текст; вкладки — только для run-level файла ---
         self._info_frame = ttk.Frame(right)
         self.info = tk.Text(self._info_frame, wrap="none", state="disabled")
         info_sb = ttk.Scrollbar(
@@ -285,18 +309,18 @@ class W2DNavigatorApp:
         info_sb.grid(row=0, column=1, sticky="ns")
         self._info_frame.rowconfigure(0, weight=1)
         self._info_frame.columnconfigure(0, weight=1)
-        self._info_frame.grid(row=0, column=0, sticky="nsew")
+        self._info_frame.grid(row=1, column=0, sticky="nsew", padx=_PANEL_PAD)
 
         # Вкладки Summary/Tasks — только при выборе run-level файла.
         self.report = ReportTabs(right)
-        self.report.grid(row=0, column=0, sticky="nsew")
+        self.report.grid(row=1, column=0, sticky="nsew", padx=_PANEL_PAD)
         self.report.grid_remove()
-        right.rowconfigure(0, weight=1)
+        right.rowconfigure(1, weight=1)
         right.columnconfigure(0, weight=1)
 
         self.actions = ttk.LabelFrame(right, text="Run actions")
         self.actions.grid(
-            row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(6, 0)
+            row=2, column=0, columnspan=2, sticky="ew", padx=_PANEL_PAD, pady=(6, 0)
         )
         self.run_buttons: list[ttk.Button] = []
         self.merge_btn = ttk.Button(
@@ -318,7 +342,9 @@ class W2DNavigatorApp:
             right, text="Open viewer", command=self.open_selected,
             state="disabled",
         )
-        self.open_btn.grid(row=2, column=0, columnspan=2, sticky="ew", pady=6, padx=6)
+        self.open_btn.grid(
+            row=3, column=0, columnspan=2, sticky="ew", pady=6, padx=_PANEL_PAD
+        )
 
         paned.add(left, weight=2)
         paned.add(right, weight=3)
@@ -414,14 +440,21 @@ class W2DNavigatorApp:
                         case_node, "end", text=run_id.split("/", 1)[1], open=False
                     )
                 self._runs[node] = run_id
+                self._node_run[node] = run_id
                 self._add_run_artifacts(node, run_id)
                 self._add_derived_node(node, run_id)
                 self._add_tasks_folder(node, run_id)
 
     def _add_run_artifacts(self, parent: str, run_id: str) -> None:
-        """Добавляет run-level файлы прогона: ``results.h5`` и/или ``report.h5``."""
+        """Добавляет run-level файлы прогона: ``results.h5`` и/или ``report.h5``.
+
+        Клик по такому файлу показывает вкладки сводки/задач, а не дамп
+        атрибутов, поэтому узел дополнительно помечается в :attr:`_file_runs`.
+        """
         for path in self.nav.run_artifacts(run_id):
-            self._add_results_node(parent, path, run_id)
+            iid = self._add_results_node(parent, path, run_id)
+            if iid is not None:
+                self._file_runs[iid] = run_id
 
     def _add_derived_node(self, parent: str, run_id: str) -> None:
         """Добавляет производные артефакты прогона (merged и total_fields)."""
@@ -429,8 +462,7 @@ class W2DNavigatorApp:
             merged_results(run_id),
             run_derived(run_id, "total_fields.hdf5"),
         ):
-            if path.is_file():
-                self._add_results_node(parent, path)
+            self._add_results_node(parent, path, run_id)
 
     def _add_tasks_folder(self, parent: str, run_id: str) -> None:
         """Добавляет узел-папку ``tasks`` с ленивыми детьми.
@@ -446,6 +478,7 @@ class W2DNavigatorApp:
         iid = f"folder::{parent}"
         self.tree.insert(parent, "end", iid=iid, text="tasks", open=False)
         self._folders[iid] = run_id
+        self._node_run[iid] = run_id
         self.tree.insert(iid, "end", iid=self._lazy_iid(iid), text="…")
 
     @staticmethod
@@ -477,6 +510,7 @@ class W2DNavigatorApp:
         for task in self.nav.tasks(run_id):
             task_node = self.tree.insert(node, "end", text=task)
             self._task_files[task_node] = self.nav.task_results(run_id, task)
+            self._node_run[task_node] = run_id
 
     def _resolve_task(self, node: str) -> None:
         """Лениво проверяет ``results.h5`` задачи при первом выборе её узла."""
@@ -492,17 +526,24 @@ class W2DNavigatorApp:
 
     def _add_results_node(
         self, parent: str, path: Path, run_id: str | None = None
-    ) -> None:
-        """Добавляет узел-файл; ``run_id`` — если файл run-level (вкладки сводки)."""
+    ) -> str | None:
+        """Добавляет узел-файл; ``run_id`` — прогон, к которому файл относится.
+
+        Возвращает iid добавленного узла (``None``, если файла нет или узел
+        уже существует). Привязка к прогону нужна шапке правой панели;
+        признак run-level файла (вкладки сводки) ставит вызывающий код
+        (:meth:`_add_run_artifacts`) через :attr:`_file_runs`.
+        """
         if not path.is_file():
-            return
+            return None
         iid = f"file::{path}"
         if iid in self._paths:
-            return
+            return None
         self.tree.insert(parent, "end", iid=iid, text=path.name)
         self._paths[iid] = path
         if run_id is not None:
-            self._file_runs[iid] = run_id
+            self._node_run[iid] = run_id
+        return iid
 
     def _clear_tree(self, info: str) -> None:
         """Очищает дерево и инфо-панель, сбрасывая выбор."""
@@ -510,6 +551,7 @@ class W2DNavigatorApp:
         self._paths.clear()
         self._runs.clear()
         self._file_runs.clear()
+        self._node_run.clear()
         self._loaded.clear()
         self._folders.clear()
         self._task_files.clear()
@@ -519,6 +561,7 @@ class W2DNavigatorApp:
         self.selected_run_node = None
         self.open_btn.configure(state="disabled")
         self._refresh_run_actions()
+        self.header.clear()
         self.report.clear()
         self._set_info(info)
 
@@ -529,6 +572,7 @@ class W2DNavigatorApp:
         iid = selection[0] if selection else None
         if iid is not None:
             self._resolve_task(iid)
+        self._update_run_header(self._node_run.get(iid) if iid else None)
         path = self._paths.get(iid) if iid else None
         run_id = self._runs.get(iid) if iid else None
         self.selected = path
@@ -677,7 +721,7 @@ class W2DNavigatorApp:
         self._set_info(f"Merge nphi done:\n{path}")
         node = self.selected_run_node
         if node is not None and self.tree.exists(node):
-            self._add_results_node(node, path)
+            self._add_results_node(node, path, self.selected_run)
         if messagebox.askyesno(
             "Merge nphi",
             f"Done:\n{path}\n\nOpen in viewer?",
@@ -771,7 +815,7 @@ class W2DNavigatorApp:
         self._set_info(f"Render fields done:\n{path}")
         node = self.selected_run_node
         if node is not None and self.tree.exists(node):
-            self._add_results_node(node, path)
+            self._add_results_node(node, path, self.selected_run)
         if messagebox.askyesno(
             "Render fields",
             f"Done:\n{path}\n\nOpen in viewer?",
@@ -779,18 +823,30 @@ class W2DNavigatorApp:
         ):
             self._open_viewer(path)
 
+    def _update_run_header(self, run_id: str | None) -> None:
+        """Заполняет шапку правой панели именем/описанием прогона.
+
+        Имя/описание берутся из ``input.toml`` (:func:`read_work_meta`), без
+        чтения HDF5; ``run_id is None`` — шапка скрывается.
+        """
+        if run_id is None:
+            self.header.clear()
+            return
+        name, description = read_work_meta(self.nav.run_dir(run_id))
+        self.header.show(name or run_id, description)
+
     def _show_run_summary(self, run_id: str) -> None:
         """Короткая сводка по прогону в обычной текстовой панели (как раньше).
 
         Показывается при выборе папки прогона/``tasks``: вкладок нет.
         """
         info = collect_run_info(self.nav, run_id)
-        self._set_info(format_run_info(info, detailed=False))
+        self._set_info(format_run_info(info, detailed=False, header=False))
 
     def _show_run_report(self, run_id: str) -> None:
         """Вкладки ``Summary``/``Tasks`` — подробный отчёт по run-level файлу."""
         self._show_report_panel()
-        self.report.show_run(collect_run_info(self.nav, run_id))
+        self.report.show_run(collect_run_info(self.nav, run_id), header=False)
 
     def _show_file_info(self, path: Path) -> None:
         if not fsprobe.is_file(path):

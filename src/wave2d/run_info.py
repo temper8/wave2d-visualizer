@@ -133,7 +133,7 @@ def collect_run_info(nav: Wave2DNavigator, run_id: str) -> RunInfo:
     """
     info = RunInfo(run_id=run_id, run_dir=nav.run_dir(run_id))
     info.tasks = nav.tasks(run_id)
-    info.name, info.description = _read_work_meta(info.run_dir)
+    info.name, info.description = read_work_meta(info.run_dir)
     artifacts = nav.run_artifacts(run_id)
     info.artifacts = [_artifact_info(p) for p in artifacts]
 
@@ -182,19 +182,24 @@ def collect_run_info(nav: Wave2DNavigator, run_id: str) -> RunInfo:
     return info
 
 
-def format_run_info(info: RunInfo, *, detailed: bool = True) -> str:
+def format_run_info(
+    info: RunInfo, *, detailed: bool = True, header: bool = True
+) -> str:
     """Форматирует сводку в текст.
 
     ``detailed=True`` (по умолчанию) — подробная сводка для run-level файла:
     секции ``Toolchain``/``Build details``/``System info`` и суммарное время
     задач. ``detailed=False`` — короткая сводка (папка прогона).
+
+    ``header=False`` — без строк ``Name``/``Desc``: их показывает отдельная
+    шапка GUI-навигатора (:class:`~src.wave2d.runheader.RunHeader`).
     """
     lines = [f"Run    : {info.run_id}", f"Path   : {info.run_dir}"]
 
-    if info.name:
+    if header and info.name:
         lines.append(f"Name   : {info.name}")
 
-    if info.description:
+    if header and info.description:
         lines.append(f"Desc   : {info.description}")
 
     if info.error is not None:
@@ -373,10 +378,12 @@ def _source_newer(
     return False
 
 
-def _read_work_meta(run_dir: Path) -> tuple[str | None, str | None]:
+def read_work_meta(run_dir: Path) -> tuple[str | None, str | None]:
     """``name`` и ``description`` из секции ``[work]`` файла ``input.toml``.
 
-    ``None`` (без исключения), если файла нет, он битый или поля пусты.
+    Публичная: используется и шапкой GUI-навигатора, которой незачем тянуть
+    полный :func:`collect_run_info`. ``None`` (без исключения), если файла
+    нет, он битый или поля пусты.
     """
     try:
         with open(run_dir / "input.toml", "rb") as f:
