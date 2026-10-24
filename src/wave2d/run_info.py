@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import re
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -395,16 +396,42 @@ def _axis_range(tasks: list[str]) -> str | None:
     return f"{axis} {min(values)}…{max(values)}" if values else None
 
 
+_VERSION_RE = re.compile(r"\d+(?:\.\d+)+")
+
+
 def _format_build(build: dict[str, Any]) -> str:
-    """Строка паспорта сборки: ``branch@commit (compiler, hdf5 ver)``."""
+    """Строка паспорта сборки: ``branch@commit (compiler ver, hdf5 ver)``."""
     commit = attr_text(build.get("git_commit", ""))[:7]
     if attr_text(build.get("git_dirty", "")) in ("True", "dirty"):
         commit += "*"
     branch = attr_text(build.get("git_branch", "?"))
-    compiler = attr_text(build.get("compiler") or build.get("compiler_ver") or "?")
+    compiler = _format_compiler(build)
     hdf5 = build.get("hdf5") or build.get("hdf5_ver")
     suffix = f", hdf5 {attr_text(hdf5)}" if hdf5 is not None else ""
     return f"{branch}@{commit} ({compiler}{suffix})"
+
+
+def _format_compiler(build: dict[str, Any]) -> str:
+    """Компилятор с версией: ``gfortran 9.4.0`` / ``GCC version 9.4.0``.
+
+    0.96: ``compiler`` (``gfortran``) + ``compiler_version`` (полная строка) —
+    версия сокращается до числа. 0.94: только ``compiler_ver`` — как есть.
+    """
+    compiler = build.get("compiler")
+    version = build.get("compiler_version") or build.get("compiler_ver")
+    if compiler and version:
+        return f"{attr_text(compiler)} {_short_version(attr_text(version))}"
+    if compiler:
+        return attr_text(compiler)
+    if version:
+        return attr_text(version)
+    return "?"
+
+
+def _short_version(text: str) -> str:
+    """Первое «версионное» число в строке (``9.4.0``) или строка целиком."""
+    match = _VERSION_RE.search(text)
+    return match.group(0) if match else text
 
 
 def _format_system(system: dict[str, Any]) -> str:
