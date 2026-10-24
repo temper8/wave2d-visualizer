@@ -5,6 +5,11 @@
 :class:`~src.wave2d.datasetview.DatasetView`, дерево содержимого — в
 :class:`~src.wave2d.h5tree.H5TreeView`.
 
+У датасета с осью стека (моды ``nphi`` у merged или угол ``phi`` у
+``total_fields.hdf5``) панель ``DatasetView`` даёт кнопку **Animate**: она
+перебирает кадры по оси стека и пишет ``MP4`` рядом с исходным файлом (см.
+:meth:`W2DViewer._animate`).
+
 Точка входа — ``w2d_viewer.py`` в корне репозитория.
 """
 
@@ -15,8 +20,10 @@ from typing import Any
 
 import numpy as np
 
+import imageio
+
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox, simpledialog, ttk
 
 from src.common.h5reader import H5Reader
 from src.common.navigator import default_navigator
@@ -68,6 +75,8 @@ class W2DViewer:
     def __init__(self, root: tk.Tk, file_path: str):
         self.root = root
         self.file_path = file_path
+        #: Идёт ли сейчас сборка MP4 (защита от повторного запуска).
+        self._animating = False
 
         # Одно соединение на всё время работы, закрывается в on_closing.
         # open_results заодно проверяет версию схемы (>= 0.94).
@@ -105,6 +114,7 @@ class W2DViewer:
             rho=self._load_axis(GRID_RHO),
             psi=self._load_axis(GRID_PSI),
             on_add_to_comparison=self._add_to_comparison,
+            on_animate=self._animate,
         )
 
         paned.add(self.tree_view, weight=1)
@@ -258,3 +268,96 @@ class W2DViewer:
         self.dataset_view.close()
         self.reader.close()
         self.root.destroy()
+
+    # --- анимация ---------------------------------------------------------
+
+    def _animate(self) -> None:
+        """Собирает MP4, перебирая кадры по оси стека текущего среза.
+
+        Анимируется ровно то, что видно: выбранный вид ``(R,Z)/(rho,theta)`` и
+        составляющая ``real/imag/abs``, а также экватор ``Z=0`` (Ring/Flat),
+        если он включён. Шкала цвета фиксируется по всему стеку — иначе кадры
+        «мигают». Свип идёт по всей оси: моды ``nphi`` у merged или угол
+        ``phi`` у ``total_fields.hdf5``. Процесс идёт в главном потоке
+        (matplotlib не потокобезопасен), по кадру на ``after`` — окно остаётся
+        отзывчивым, а холст служит превью. Результат — ``MP4`` рядом с
+        исходным файлом, в подпапке ``animations/``.
+        """
+        view = self.dataset_view
+        if self._animating:
+            return
+        selection = view.stacked_selection()
+        if selection is None:
+            messagebox.showinfo(
+                "Animate",
+                "Select a dataset with a mode/angle axis (merged or total field).",
+                parent=self.root,
+            )
+            return
+        length = view.stack_length()
+        if length < 2:
+            messagebox.showinfo(
+                "Animate",
+                "Need at least 2 frames along the stack axis.",
+                parent=self.root,
+            )
+            return
+        fps = simpledialog.askinteger(
+            "Animate",
+            "Frames per second:",
+            parent=self.root, initialvalue=10, minvalue=1, maxvalue=60,
+        )
+        if fps is None:
+            return
+
+        source = Path(self.file_path)
+        axis = selection.mode_name or "axis"
+        out = source.parent / "animations" / f"{source.stem}__{axis}.mp4"
+        try:
+            out.parent.mkdir(parents=True, exist_ok=True)
+            writer = imageio.get_writer(
+                str(out), fps=fps, codec="libx264", quality=8,
+                macro_block_size=2,
+            )
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror(
+                "Animate", f"Could not start video writer:\n{e}",
+                parent=self.root,
+            )
+            return
+
+        self._animating = True
+        original_index = int(view.mode_var.get())
+        original_title = self.root.title()
+        view.set_color_limits(*view.animation_color_limits())
+
+        def finish(error: str | None = None) -> None:
+            try:
+                writer.close()
+            except Exception:  # noqa: BLE001
+                pass
+            self._animating = False
+            view.set_color_limits(None, None)  # вернуть автоподбор шкалы
+            view.mode_var.set(original_index)
+            view.redraw()
+            self.root.title(original_title)
+            if error is None:
+                messagebox.showinfo(
+                    "Animate", f"Saved:\n{out}", parent=self.root
+                )
+            else:
+                messagebox.showerror("Animate", error, parent=self.root)
+
+        def step(index: int) -> None:
+            if index >= length:
+                finish()
+                return
+            try:
+                writer.append_data(view.render_frame(index))
+            except Exception as e:  # noqa: BLE001
+                finish(str(e))
+                return
+            self.root.title(f"{original_title} — animating {index + 1}/{length}")
+            self.root.after(1, lambda: step(index + 1))
+
+        self.root.after(1, lambda: step(0))

@@ -12,7 +12,9 @@
   ``phi``); для одной моды ``nphi`` — тем же чекбоксом (по умолчанию
   **выключен**), при этом поле реконструируется как ``An(n)·e^{i·n·phi}·E_n``,
   добавляется **второй слайдер** угла ``phi`` и переключатель **Ring / Flat
-  (R,phi)** (полярный топ-вид или плоская развёртка ``R``×``phi``);
+  (R,phi)** (полярный топ-вид или плоская развёртка ``R``×``phi``); у 2D-среза
+  стека есть кнопка **Animate** (перебор кадров по оси стека, ``MP4`` — см.
+  :meth:`W2DViewer._animate`);
 - **1D** — одна или **несколько** линий против общей оси
   ``index``/``rho``/``psi`` (``rho``/``psi`` — если переданы и совпадают по
   длине у всех рядов) с подписями из атрибута ``units`` и легендой;
@@ -100,11 +102,13 @@ class DatasetView(ttk.Frame):
         major_radius: np.ndarray | None = None,
         spectrum_an: dict[int, complex] | None = None,
         on_add_to_comparison: Callable[[Selection], None] | None = None,
+        on_animate: Callable[[], None] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(master, **kwargs)
         self.R: np.ndarray | None = None
         self._on_add_to_comparison = on_add_to_comparison
+        self._on_animate = on_animate
         self.Z: np.ndarray | None = None
         self.set_coords(coords)
         self.major_radius: np.ndarray | None = None
@@ -115,6 +119,10 @@ class DatasetView(ttk.Frame):
         self._axes: dict[str, tuple[np.ndarray, Any]] = {}
         self.set_axes(rho, psi)
         self._colorbar = None
+        #: Фиксированные пределы шкалы цвета (``(vmin, vmax)``) на время анимации.
+        self._clim: tuple[float, float] | None = None
+        #: То же для панели экватора (реконструкция моды ``nphi`` может отличаться).
+        self._equator_clim: tuple[float, float] | None = None
         self._attr_expanded: bool | None = None
         self._selection: Selection | list[Selection] | None = None
         self._selections: list[Selection] = []
@@ -429,6 +437,19 @@ class DatasetView(ttk.Frame):
                 command=self.redraw,
             ).pack(side=tk.LEFT)
 
+    def _add_animate_button(self) -> None:
+        """Кнопка «Animate» — справа в строке переключателей стека.
+
+        Появляется только у 2D-срезов с осью стека (моды ``nphi`` у merged или
+        угол ``phi`` у ``total_fields.hdf5``) и только если оркестратор задал
+        обработчик ``on_animate``. Сам процесс — во viewer.
+        """
+        if self._on_animate is None:
+            return
+        ttk.Button(
+            self.controls, text="Animate", command=self._on_animate,
+        ).pack(side=tk.RIGHT)
+
     def _add_compare_button(self) -> None:
         """Кнопка «В сравнение» — справа в строке переключателей."""
         if self._on_add_to_comparison is None:
@@ -466,6 +487,7 @@ class DatasetView(ttk.Frame):
                 self._add_equator_controls(first)
             self._add_view_buttons()
             self._add_comp_buttons()
+            self._add_animate_button()
         else:
             self._add_axis_buttons([replace(first, data=self._slice(first))])
             if np.iscomplexobj(first.data):
@@ -580,6 +602,109 @@ class DatasetView(ttk.Frame):
             return f"phi={np.rad2deg(float(values[index])):.1f}°"
         return f"{name}={int(values[index])}"
 
+    # --- анимация (оркестратор — viewer) ---------------------------------
+
+    def stacked_selection(self) -> Selection | None:
+        """Первый выбранный датасет с осью стека (режим 3D) или ``None``."""
+        for selection in self._selections:
+            if selection.data is not None and selection.mode_axis is not None:
+                return selection
+        return None
+
+    def stack_length(self) -> int:
+        """Число кадров по оси стека (``0``, если датасета с осью нет)."""
+        selection = self.stacked_selection()
+        if selection is None or selection.mode_axis is None:
+            return 0
+        return int(selection.data.shape[selection.mode_axis])
+
+    def set_color_limits(
+        self,
+        clim: tuple[float, float] | None,
+        equator_clim: tuple[float, float] | None = None,
+    ) -> None:
+        """Фиксирует (``clim``) или отпускает (``None``) шкалы цвета и перерисовывает.
+
+        Первая пара — основная карта, вторая — панель экватора ``Z=0``.
+        """
+        self._clim = clim
+        self._equator_clim = equator_clim
+        self.redraw()
+
+    def global_color_limits(self) -> tuple[float, float] | None:
+        """Диапазон выбранной составляющей по всему стеку (для фиксации шкалы).
+
+        Считается по всей оси стека (не только по текущему срезу), чтобы
+        шкала цвета не плавала от кадра к кадру. Нечисловые (``NaN``/``inf``)
+        точки игнорируются.
+        """
+        selection = self.stacked_selection()
+        if selection is None:
+            return None
+        values = np.asarray(component(selection.data, self.comp_var.get()))
+        finite = values[np.isfinite(values)]
+        if finite.size == 0:
+            return None
+        return float(finite.min()), float(finite.max())
+
+    def animation_color_limits(
+        self,
+    ) -> tuple[tuple[float, float] | None, tuple[float, float] | None]:
+        """Пределы шкал ``(карта, экватор)`` на всю анимацию.
+
+        Карта — диапазон составляющей по всему стеку. Экватор для оси ``phi``
+        берётся из тех же данных (подмножество), для оси ``nphi`` — из
+        реконструкции ``An(n)·e^{i·n·phi}·E_n`` (диапазон по всем модам).
+        ``None`` — экватор не включён или геометрии нет.
+        """
+        main = self.global_color_limits()
+        selection = self.stacked_selection()
+        if selection is None:
+            return main, None
+        if selection.mode_name == "phi":
+            return main, main
+        if selection.mode_name == "nphi" and self._equatorial_ready(selection):
+            return main, self._nphi_equator_limits(selection)
+        return main, None
+
+    def _nphi_equator_limits(
+        self, selection: Selection
+    ) -> tuple[float, float] | None:
+        """Диапазон значений экватора-реконструкции по всем модам.
+
+        Для ``abs`` — ``[0, max|An·E|]``; для ``real``/``imag`` — ``[-b, b]``,
+        где ``b = max|An·E|`` (фаза ``e^{i·n·phi}`` не меняет модуль).
+        """
+        modes = selection.mode_values
+        data = selection.data
+        major = self.major_radius
+        if modes is None or data is None or major is None or len(modes) == 0:
+            return None
+        indices = self._midplane_indices(major)
+        if indices is None:
+            return None
+        i_out, i_in = indices
+        peak = 0.0
+        for imode in range(len(modes)):
+            weight = abs(self.spectrum_an.get(int(modes[imode]), 1.0 + 0.0j))
+            for column in (i_out, i_in):
+                block = np.abs(data[:, column, imode])
+                if block.size:
+                    peak = max(peak, float(np.nanmax(block)) * weight)
+        if peak <= 0:
+            return None
+        if self.comp_var.get() == "abs":
+            return 0.0, peak
+        return -peak, peak
+
+    def render_frame(self, index: int) -> np.ndarray:
+        """Ставит срез по индексу оси стека, рисует холст и возвращает ``RGB``-кадр."""
+        self.mode_var.set(int(index))
+        self.redraw()
+        self.canvas.draw()
+        rgba = np.asarray(self.canvas.buffer_rgba())
+        return np.ascontiguousarray(rgba[..., :3])
+
     def _draw_stacked(self) -> None:
         """Рисует срез стека по моде: 2D-карту поля или 1D-профиль."""
         selection = self._selections[0]
@@ -610,6 +735,8 @@ class DatasetView(ttk.Frame):
                 self.ax, self.fig, sliced, title=title,
                 view=self.view_var.get(), R=self.R, Z=self.Z,
                 comp=self.comp_var.get(),
+                vmin=None if self._clim is None else self._clim[0],
+                vmax=None if self._clim is None else self._clim[1],
             )
             self._draw_toroidal(selection)
 
@@ -707,6 +834,8 @@ class DatasetView(ttk.Frame):
             current=current,
             title=selection.path or "",
             fill=self.fill_var.get(),
+            vmin=None if self._equator_clim is None else self._equator_clim[0],
+            vmax=None if self._equator_clim is None else self._equator_clim[1],
         )
         if self.equator_view_var.get() == "flat":
             self._toroidal_colorbar = draw_equatorial_map(

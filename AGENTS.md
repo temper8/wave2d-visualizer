@@ -48,7 +48,7 @@ Python-комплекс для конвертации, 2D-визуализаци
 ```bash
 uv run elmfire_convert.py     # ELMFIRE *.dat -> z1.h5
 uv run w2d_render.py          # 2D-графики полей из results.h5 (или первой задачи)
-uv run w2d_viewer.py          # GUI: дерево HDF5 (results.h5/report.h5) + поле (+ топ-вид экватора Z=0: Ring/Flat (R,phi))
+uv run w2d_viewer.py          # GUI: дерево HDF5 (results.h5/report.h5) + поле (+ топ-вид экватора Z=0: Ring/Flat (R,phi)); у стека по nphi/phi — кнопка Animate -> MP4 в derived/.../animations/
 uv run w2d_app.py             # GUI: выбор прогона -> viewer, слияние nphi, рендер полей
 uv run elmfire_viewer.py      # GUI просмотра флуктуаций
 uv run tools/integrator.py    # интеграл перекрытия
@@ -71,8 +71,8 @@ src/
 ├── interpolator.py          # get_periodic_interpolator / get_interpolator
 ├── plasma_fluctuations.py   # PlasmaFluctuations — ленивое чтение кадров z1.h5
 ├── wave2d/
-│   ├── viewer.py            # W2DViewer — окно просмотра results.h5
-│   ├── app.py               # W2DNavigatorApp — GUI-навигатор по прогонам
+│   ├── viewer.py            # W2DViewer — окно просмотра results.h5 (+ анимация MP4 по оси nphi/phi)
+│   ├── app.py               # W2DNavigatorApp — GUI-навигатор по прогонам (+ папка animations)
 │   ├── merge.py             # слияние задач по nphi (3D-стек) -> derived/runs/.../nphi_merged.h5
 │   ├── total_field.py       # сумма полей по спектру nphi -> total_fields.hdf5
 │   ├── run_info.py          # сводка+отчёт по прогону (report/manifest): Summary/Tasks + кэш run_info.yaml
@@ -128,6 +128,7 @@ data/
     ├── runs/<case_id>/<stamp>/   # производные артефакты прогона (viewer)
     │   ├── nphi_merged.h5        # 3D-стек задач по nphi (кнопка «Слияние»)
     │   ├── total_fields.hdf5     # сумма полей по спектру nphi (w2d_total_field.py)
+    │   ├── animations/            # MP4 по осям nphi/phi (кнопка Animate во viewer)
     │   └── run_info.yaml         # кэш сводки по прогону (src/wave2d/run_info.py; версия RUN_INFO_VERSION; GUI пока не использует)
     ├── plots/{FT-2_LH_smoke,FT-2_LH_smoke_nphi,FT2}/   # карты полей (w2d_render.py)
     ├── frames/WagD/          # 945 PNG кадров флуктуаций

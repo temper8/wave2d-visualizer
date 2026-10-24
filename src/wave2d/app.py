@@ -28,6 +28,11 @@
 заданном числе точек по углу ``phi`` и пишет ``total_fields.hdf5`` рядом с
 merged-файлом; готовый файл открывается во viewer.
 
+Папка ``derived/runs/<case>/<stamp>/animations`` с роликами (их собирает
+viewer по кнопке Animate) появляется в дереве листом-папкой ``animations``;
+двойной клик по MP4 открывает его системным проигрывателем
+(:meth:`W2DNavigatorApp._open_video`), а не viewer'ом — это не HDF5.
+
 Кнопка **«Открыть»** в шапке позволяет выбрать другую папку Wave2D; выбранный
 путь запоминается между запусками через :mod:`src.common.settings`.
 При наличии WSL рядом добавляются кнопки с именами дистрибутивов
@@ -39,7 +44,10 @@ merged-файлом; готовый файл открывается во viewer.
 
 from pathlib import Path
 
+import os
 import queue
+import subprocess
+import sys
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
@@ -111,7 +119,10 @@ class W2DNavigatorApp:
         self._task_files: dict[str, Path] = {}
         # iid задач без файла (проверено лениво — повторно не stat).
         self._missing: set[str] = set()
+        # iid видео-файлов из папки ``animations`` -> путь к MP4.
+        self._videos: dict[str, Path] = {}
         self.selected: Path | None = None
+        self.selected_video: Path | None = None
 
         # Состояние выбранного прогона и фонового слияния по nphi.
         self.selected_run: str | None = None
@@ -457,12 +468,47 @@ class W2DNavigatorApp:
                 self._file_runs[iid] = run_id
 
     def _add_derived_node(self, parent: str, run_id: str) -> None:
-        """Добавляет производные артефакты прогона (merged и total_fields)."""
+        """Добавляет производные артефакты прогона (merged, total_fields, animations)."""
         for path in (
             merged_results(run_id),
             run_derived(run_id, "total_fields.hdf5"),
         ):
             self._add_results_node(parent, path, run_id)
+        self._add_animations_node(parent, run_id)
+
+    def _add_animations_node(self, parent: str, run_id: str) -> None:
+        """Добавляет папку ``animations`` с собранными роликами (если она есть).
+
+        MP4 создаёт viewer (кнопка Animate). Это не HDF5, поэтому клик по
+        ролику показывает сведения о файле, а двойной — открывает системным
+        проигрывателем (см. :meth:`_open_video`). Папка появляется в дереве
+        после перестройки (``Refresh``).
+        """
+        anim_dir = run_derived(run_id, "animations")
+        if not fsprobe.is_dir(anim_dir):
+            return
+        try:
+            videos = sorted(
+                (
+                    p for p in anim_dir.iterdir()
+                    if p.is_file() and p.suffix.lower() in (".mp4", ".webm", ".mkv")
+                ),
+                key=lambda p: p.name.lower(),
+            )
+        except OSError:
+            return
+        if not videos:
+            return
+        iid = f"animations::{parent}"
+        self.tree.insert(parent, "end", iid=iid, text="animations", open=False)
+        self._node_run[iid] = run_id
+        for video in videos:
+            node = f"video::{video}"
+            if node in self._videos:
+                continue
+            self.tree.insert(iid, "end", iid=node, text=video.name)
+            self._videos[node] = video
+            self._node_run[node] = run_id
 
     def _add_tasks_folder(self, parent: str, run_id: str) -> None:
         """Добавляет узел-папку ``tasks`` с ленивыми детьми.
@@ -556,7 +602,9 @@ class W2DNavigatorApp:
         self._folders.clear()
         self._task_files.clear()
         self._missing.clear()
+        self._videos.clear()
         self.selected = None
+        self.selected_video = None
         self.selected_run = None
         self.selected_run_node = None
         self.open_btn.configure(state="disabled")
@@ -574,13 +622,20 @@ class W2DNavigatorApp:
             self._resolve_task(iid)
         self._update_run_header(self._node_run.get(iid) if iid else None)
         path = self._paths.get(iid) if iid else None
+        video = self._videos.get(iid) if iid else None
         run_id = self._runs.get(iid) if iid else None
         self.selected = path
+        self.selected_video = video
         self.selected_run = run_id
         self.selected_run_node = iid if run_id is not None else None
-        self.open_btn.configure(state="normal" if path else "disabled")
+        self.open_btn.configure(
+            state="normal" if (path or video) else "disabled",
+            text="Open video" if video else "Open viewer",
+        )
         self._refresh_run_actions()
-        if path is not None:
+        if video is not None:
+            self._show_video_info(video)
+        elif path is not None:
             file_run = self._file_runs.get(iid) if iid else None
             if file_run is not None:
                 self._show_run_report(file_run)
@@ -601,12 +656,40 @@ class W2DNavigatorApp:
             self._set_info("")
 
     def on_double(self, event=None) -> None:
-        if self.selected is not None:
+        if self.selected_video is not None:
+            self._open_video(self.selected_video)
+        elif self.selected is not None:
             self._open_viewer(self.selected)
 
     def open_selected(self) -> None:
-        if self.selected is not None:
+        if self.selected_video is not None:
+            self._open_video(self.selected_video)
+        elif self.selected is not None:
             self._open_viewer(self.selected)
+
+    def _open_video(self, path: Path) -> None:
+        """Открывает ролик системным проигрывателем по умолчанию.
+
+        viewer не подходит: MP4 — не HDF5. Windows — ``os.startfile``,
+        macOS — ``open``, остальные — ``xdg-open``.
+        """
+        if not fsprobe.is_file(path):
+            messagebox.showerror(
+                "Video unavailable", f"File not found:\n{path}", parent=self.root
+            )
+            return
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(path)  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", str(path)])
+            else:
+                subprocess.Popen(["xdg-open", str(path)])
+        except OSError as e:
+            messagebox.showerror(
+                "Open video", f"Could not open:\n{path}\n\n{e}",
+                parent=self.root,
+            )
 
     def _open_viewer(self, path: Path) -> None:
         # Проверяем доступность файла и версию до создания окна: иначе при
@@ -847,6 +930,17 @@ class W2DNavigatorApp:
         """Вкладки ``Summary``/``Tasks`` — подробный отчёт по run-level файлу."""
         self._show_report_panel()
         self.report.show_run(collect_run_info(self.nav, run_id), header=False)
+
+    def _show_video_info(self, path: Path) -> None:
+        """Сведения о ролике из папки ``animations`` (в инфо-панели)."""
+        if not fsprobe.is_file(path):
+            self._set_info(f"Video unavailable:\n{path}")
+            return
+        size_mb = path.stat().st_size / 1e6
+        self._set_info(
+            f"Video : {path}\nSize  : {size_mb:.2f} MB\n\n"
+            "Double-click to open in the default player."
+        )
 
     def _show_file_info(self, path: Path) -> None:
         if not fsprobe.is_file(path):

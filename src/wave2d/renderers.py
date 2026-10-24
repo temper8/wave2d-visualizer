@@ -47,20 +47,27 @@ def draw_2d(
     R: np.ndarray | None = None,
     Z: np.ndarray | None = None,
     comp: str = "abs",
+    vmin: float | None = None,
+    vmax: float | None = None,
 ) -> Colorbar:
     """Рисует 2D-датасет и возвращает созданный colorbar.
 
     Вид ``(R,Z)`` используется, только если он запрошен (``view == "rz"``) и
     координаты ``R``/``Z`` совпадают по форме с данными; иначе — ``(rho,theta)``.
+    ``vmin``/``vmax`` фиксируют шкалу цвета (нужно для анимации, чтобы кадры
+    не «мигали»); ``None`` — автоподбор по данным.
     """
     arr = component(data, comp)
     use_rz = view == "rz" and R is not None and R.shape == data.shape
     if use_rz:
-        mesh = ax.pcolormesh(R, Z, arr, shading="gouraud")
+        mesh = ax.pcolormesh(R, Z, arr, shading="gouraud", vmin=vmin, vmax=vmax)
         ax.set_aspect("equal")
         ax.set_title(f"{title} (R,Z)", fontsize=8)
     else:
-        mesh = ax.imshow(arr, origin="lower", aspect="equal", interpolation="none")
+        mesh = ax.imshow(
+            arr, origin="lower", aspect="equal", interpolation="none",
+            vmin=vmin, vmax=vmax,
+        )
         ax.set_title(f"{title} (rho,theta)", fontsize=8)
     # Цветовая шкала — на собственной оси справа от картинки. Через
     # ``fig.colorbar(ax=...)`` нельзя: он выставляет ``anchor=(1, 0.5)`` и при
@@ -133,6 +140,8 @@ def draw_equatorial_view(
     title: str = "",
     cmap: str = "viridis",
     fill: bool = False,
+    vmin: float | None = None,
+    vmax: float | None = None,
 ) -> Colorbar:
     """Экваториальное сечение ``Z=0`` в топ-виде тора (данные поля).
 
@@ -167,12 +176,15 @@ def draw_equatorial_view(
             values[order],
             shading="gouraud",
             cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
         )
     else:
         mesh = ax.scatter(
             np.outer(r, np.cos(phi)).ravel(),
             np.outer(r, np.sin(phi)).ravel(),
             c=values.ravel(), s=6, cmap=cmap, marker="s", linewidths=0,
+            vmin=vmin, vmax=vmax,
         )
     r_max = float(r.max())
     r_min = float(r.min())
@@ -238,6 +250,8 @@ def draw_equatorial_map(
     cmap: str = "viridis",
     fill: bool = False,
     xlabel: str = "R, cm",
+    vmin: float | None = None,
+    vmax: float | None = None,
 ) -> Colorbar:
     """Вариант B: плоская развёртка экватора ``(R, phi)``.
 
@@ -263,13 +277,16 @@ def draw_equatorial_map(
     if fill and phi_deg.size >= 2 and r.size >= 2:
         # Сетка (phi × R): значения транспонируем под форму X/Y.
         xx, yy = np.meshgrid(r, phi_deg)
-        mesh = ax.pcolormesh(xx, yy, values.T, shading="gouraud", cmap=cmap)
+        mesh = ax.pcolormesh(
+            xx, yy, values.T, shading="gouraud", cmap=cmap,
+            vmin=vmin, vmax=vmax,
+        )
     else:
         xx = np.tile(r, phi_deg.size)
         yy = np.repeat(phi_deg, r.size)
         mesh = ax.scatter(
             xx, yy, c=values.T.ravel(), s=4, cmap=cmap, marker="s",
-            linewidths=0,
+            linewidths=0, vmin=vmin, vmax=vmax,
         )
     r_min, r_max = float(r.min()), float(r.max())
     ax.set_xlim(r_min, r_max)
