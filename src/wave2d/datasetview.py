@@ -6,12 +6,13 @@
   ``(rho,theta)``, с выбором составляющей ``real``/``imag``/``abs`` и colorbar;
 - **3D-стек** — срез файла с осью стека последней (моды ``nphi`` у merged или
   угол ``phi`` у ``total_fields.hdf5``): слайдер оси + та же отрисовка, что для
-  2D (поле) или 1D (профиль); для оси ``phi`` — чекбокс «Equator (Z=0)»
-  (топ-вид тора: экваториальное сечение ``Z=0`` при наличии ``/geometry/R``
-  либо схема-компас со стрелкой на текущем ``phi``); для одной моды ``nphi``
-  экватор реконструируется как ``An(n)·e^{i·n·phi}·E_n`` и добавляется
-  **второй слайдер** угла ``phi``, а также переключатель **Ring / Flat (R,phi)**
-  (полярный топ-вид или плоская развёртка ``R``×``phi``);
+  2D (поле) или 1D (профиль); экватор ``Z=0`` (топ-вид тора) для оси ``phi``
+  включается чекбоксом **Equator (Z=0)** (по умолчанию **включён**; при
+  наличии ``/geometry/R`` — сечение, иначе схема-компас со стрелкой на текущем
+  ``phi``); для одной моды ``nphi`` — тем же чекбоксом (по умолчанию
+  **выключен**), при этом поле реконструируется как ``An(n)·e^{i·n·phi}·E_n``,
+  добавляется **второй слайдер** угла ``phi`` и переключатель **Ring / Flat
+  (R,phi)** (полярный топ-вид или плоская развёртка ``R``×``phi``);
 - **1D** — одна или **несколько** линий против общей оси
   ``index``/``rho``/``psi`` (``rho``/``psi`` — если переданы и совпадают по
   длине у всех рядов) с подписями из атрибута ``units`` и легендой;
@@ -190,8 +191,10 @@ class DatasetView(ttk.Frame):
         self.mode_var = tk.IntVar(value=0)
         #: Слайдер тороидального угла (реконструкция одной моды ``nphi``).
         self.phi_var = tk.IntVar(value=0)
-        #: Чекбокс «Equator (Z=0)» (топ-вид тора рядом с полоидальной картой).
-        self.toroidal_var = tk.BooleanVar(value=True)
+        #: Чекбокс «Equator (Z=0)» для моды ``nphi`` (по умолчанию выключен).
+        self.toroidal_var = tk.BooleanVar(value=False)
+        #: Чекбокс экватора для оси ``phi`` (``total_fields.hdf5``) — включён.
+        self.phi_toroidal_var = tk.BooleanVar(value=True)
         #: Чекбокс «Fill» (экватор через ``pcolormesh`` вместо маркеров).
         self.fill_var = tk.BooleanVar(value=False)
         #: Переключатель вида экватора: ``ring`` (полярный) или ``flat`` (R,phi).
@@ -449,18 +452,18 @@ class DatasetView(ttk.Frame):
     def _add_stacked_controls(self) -> None:
         """Переключатели стека: слайдер моды/угла, затем вид/ось/составляющая.
 
-        Для одной моды ``nphi`` с геометрией добавляется второй слайдер
-        (тороидальный угол) и переключатели экватора (Ring / Flat (R,phi)).
+        Для одной моды ``nphi`` с геометрией экватор ``Z=0`` включается
+        чекбоксом (по умолчанию выключен); при включении добавляются слайдер
+        тороидального угла и переключатели Ring / Flat (R,phi). Для оси ``phi``
+        экватор включён всегда.
         """
         first = self._selections[0]
         self._add_mode_scale(first)
         if first.data is None:
             return
         if first.data.ndim - 1 == 2:
-            if first.mode_name == "nphi" and self._equatorial_ready(first):
-                self._add_angle_scale()
             if first.mode_name == "phi" or self._equatorial_ready(first):
-                self._add_equator_controls()
+                self._add_equator_controls(first)
             self._add_view_buttons()
             self._add_comp_buttons()
         else:
@@ -509,20 +512,34 @@ class DatasetView(ttk.Frame):
         self._phi_label = ttk.Label(frame, text=f"phi={self.phi_var.get()}°")
         self._phi_label.pack(side=tk.LEFT, padx=(6, 0))
 
-    def _add_equator_controls(self) -> None:
-        """Экватор ``Z=0``: чекбокс, переключатель Ring/Flat (R,phi) и «Fill».
+    def _equator_var(self, selection: Selection) -> tk.BooleanVar:
+        """Чекбокс экватора для выбора: у оси ``phi`` он свой (включён)."""
+        if selection.mode_name == "phi":
+            return self.phi_toroidal_var
+        return self.toroidal_var
 
-        Доступно датасетам с осью ``phi`` (``total_fields.hdf5``) и одной моде
-        ``nphi`` merged-файла (реконструкция ``An(n)·e^{i·n·phi}``). «Ring» —
-        полярный топ-вид (кольцо), «Flat (R,phi)» — плоская развёртка
-        ``R``×``phi``. «Fill» включает ``pcolormesh`` вместо ``scatter``.
+    def _add_equator_controls(self, selection: Selection) -> None:
+        """Экватор ``Z=0``: переключатель опции и зависимые контролы.
+
+        Управляется чекбоксом ``Equator (Z=0)``: для оси ``phi``
+        (``total_fields.hdf5``) он по умолчанию **включён**, для одной моды
+        ``nphi`` (merged-файл) — **выключен**. При включении для моды ``nphi``
+        добавляется слайдер тороидального угла :meth:`_add_angle_scale`; при
+        выключении экватор не рисуется и не считается. «Ring» — полярный
+        топ-вид (кольцо), «Flat (R,phi)» — плоская развёртка ``R``×``phi``;
+        «Fill» включает ``pcolormesh`` вместо ``scatter``.
         """
+        var = self._equator_var(selection)
         ttk.Checkbutton(
             self.controls_row2,
             text="Equator (Z=0)",
-            variable=self.toroidal_var,
-            command=self.redraw,
+            variable=var,
+            command=self._equator_toggled,
         ).pack(side=tk.LEFT, padx=(0, 20))
+        if not var.get():
+            return
+        if selection.mode_name != "phi":
+            self._add_angle_scale()
         frame = ttk.Frame(self.controls_row2)
         frame.pack(side=tk.LEFT, padx=(0, 20))
         ttk.Radiobutton(
@@ -596,14 +613,29 @@ class DatasetView(ttk.Frame):
             )
             self._draw_toroidal(selection)
 
+    def _equator_toggled(self) -> None:
+        """Пересобирает контролы после включения/выключения экватора.
+
+        Делается отложенно (``after_idle``): чекбокс, вызвавший команду, будет
+        уничтожен при перестроении панели — нельзя делать это внутри его
+        обработчика.
+        """
+        selection = self._selection
+        self.after_idle(lambda: self.show(selection))
+
+    def _equator_enabled(self, selection: Selection) -> bool:
+        """Включён ли экватор: по чекбоксу (у оси ``phi`` — свой)."""
+        return bool(self._equator_var(selection).get())
+
     def _draw_toroidal(self, selection: Selection) -> None:
         """Топ-вид экватора рядом с картой, если включён.
 
         Для оси ``phi`` — экваториальное сечение из данных (или схема-компас
         без ``/geometry/R``). Для оси ``nphi`` — реконструкция одной моды
-        ``An(n)·e^{i·n·phi}·E_n``; без геометрии топ-вид не рисуется.
+        ``An(n)·e^{i·n·phi}·E_n``; без геометрии топ-вид не рисуется. При
+        выключенном экваторе реконструкция не считается вовсе.
         """
-        if not self.toroidal_var.get() or selection.data is None:
+        if not self._equator_enabled(selection) or selection.data is None:
             return
         ready = selection.mode_name == "phi" or (
             selection.mode_name == "nphi" and self._equatorial_ready(selection)
