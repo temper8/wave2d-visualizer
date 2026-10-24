@@ -76,7 +76,7 @@ src/
 │   ├── merge.py             # слияние задач по nphi (3D-стек) -> derived/runs/.../nphi_merged.h5
 │   ├── total_field.py       # сумма полей по спектру nphi -> total_fields.hdf5
 │   ├── run_info.py          # сводка+отчёт по прогону (report/manifest): Summary/Tasks + кэш run_info.yaml
-│   ├── reportview.py        # ReportTabs — вкладки правой панели навигатора (Summary/Tasks/Details)
+│   ├── reportview.py        # ReportTabs — вкладки Summary/Tasks для run-level файла (report.h5)
 │   ├── schema.py            # константы и проверка версии схемы HDF5
 │   └── assets/
 │       ├── w2d_app_icon.png # иконка окна (генератор — tools/make_icon.py)

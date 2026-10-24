@@ -1,16 +1,18 @@
-"""Виджет правой панели навигатора: вкладки сводки прогона.
+"""Виджет правой панели навигатора: вкладки отчёта по прогону.
 
-Три вкладки вместо прежнего единого ``tk.Text``:
+Показывается только для run-level файла (``report.h5``/``results.h5``):
 
 - ``Summary`` — подробная сводка по прогону
   (:func:`~src.wave2d.run_info.format_run_info`);
 - ``Tasks`` — таблица задач (:class:`ttk.Treeview`) с сортировкой по клику
-  на заголовок;
-- ``Details`` — произвольный текст: логи слияния/рендера и сведения о файле.
+  на заголовок.
+
+Для папки прогона и листов задач используется обычная текстовая панель
+(:mod:`src.wave2d.app`) — там вкладок нет.
 
 Виджет не знает ни про HDF5, ни про навигатор: данные приходят готовыми
-(:class:`~src.wave2d.run_info.RunInfo` или строка), поэтому его можно
-переиспользовать вне GUI-навигатора.
+(:class:`~src.wave2d.run_info.RunInfo`), поэтому его можно переиспользовать
+вне GUI-навигатора.
 """
 
 from __future__ import annotations
@@ -38,38 +40,26 @@ _TASK_WIDTHS = {
 
 
 class ReportTabs(ttk.Notebook):
-    """Вкладки правой панели: ``Summary`` / ``Tasks`` / ``Details``."""
+    """Вкладки отчёта по прогону: ``Summary`` / ``Tasks``."""
 
     def __init__(self, master, **kwargs) -> None:
         super().__init__(master, **kwargs)
         self._summary_frame, self.summary = self._add_text_tab("Summary")
         self._tasks_frame, self.tasks = self._add_tasks_tab("Tasks")
-        self._details_frame, self.details = self._add_text_tab("Details")
         self._task_rows: list[TaskInfo] = []
         self._task_sort: tuple[str | None, bool] = (None, False)
 
     # --- публичный интерфейс -------------------------------------------
 
-    def show_run(self, info: RunInfo, *, detailed: bool = True) -> None:
-        """Показывает сводку прогона и выбирает вкладку ``Summary``.
-
-        ``detailed=True`` (run-level файл, напр. ``report.h5``) — подробная
-        сводка плюс таблица задач. ``detailed=False`` (папка прогона) —
-        короткая сводка, таблица задач пуста.
-        """
-        _set_text(self.summary, format_run_info(info, detailed=detailed))
-        self._fill_tasks(info.task_details if detailed else [])
+    def show_run(self, info: RunInfo) -> None:
+        """Показывает подробную сводку и таблицу задач, выбирает ``Summary``."""
+        _set_text(self.summary, format_run_info(info))
+        self._fill_tasks(info.task_details)
         self.select(self._summary_frame)
 
-    def show_details(self, text: str) -> None:
-        """Показывает текст на вкладке ``Details`` и выбирает её."""
-        _set_text(self.details, text)
-        self.select(self._details_frame)
-
     def clear(self) -> None:
-        """Очищает все вкладки (при перестройке дерева)."""
+        """Очищает вкладки (при перестройке дерева навигатора)."""
         _set_text(self.summary, "")
-        _set_text(self.details, "")
         self._fill_tasks([])
 
     # --- построение вкладок --------------------------------------------

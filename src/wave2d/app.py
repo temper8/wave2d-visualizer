@@ -5,10 +5,11 @@
 ``tasks`` → задачи), в листьях — реальные HDF5-файлы (``results.h5``,
 ``report.h5``). Список задач и проверка их файлов выполняются лениво —
 при раскрытии папки ``tasks`` и выборе конкретной задачи соответственно.
-Правая панель — вкладки :class:`~src.wave2d.reportview.ReportTabs`
-(``Summary``/``Tasks``/``Details``): папка прогона показывает короткую сводку,
-run-level файл (``report.h5``/``results.h5``) — подробную сводку с таблицей
-задач, лист задачи — сведения о файле. Выбор **папки прогона** включает
+Правая панель — обычный текст (сводка прогона, логи, сведения о файле).
+При выборе run-level файла (``report.h5``/``results.h5``) вместо него
+показываются вкладки :class:`~src.wave2d.reportview.ReportTabs`
+(``Summary`` с подробной сводкой и ``Tasks`` с таблицей задач); папка прогона
+оставляет прежнюю короткую текстовую сводку. Выбор **папки прогона** включает
 панель кнопок действий с прогоном. Кнопка (или двойной клик) открывает
 :class:`~src.wave2d.viewer.W2DViewer` в отдельном окне ``Toplevel``.
 
@@ -52,7 +53,7 @@ from src.common.wsl import wsl_roots
 from src.wave2d.merge import merge_nphi_tasks, nphi_tasks
 from src.wave2d.total_field import total_field_pol_xs, write_total_fields
 from src.wave2d.reportview import ReportTabs
-from src.wave2d.run_info import collect_run_info, shallow_attrs
+from src.wave2d.run_info import collect_run_info, format_run_info, shallow_attrs
 from src.wave2d.schema import (
     MANIFEST,
     REPORT,
@@ -272,10 +273,24 @@ class W2DNavigatorApp:
         self.tree.bind("<Double-1>", self.on_double)
         self.tree.bind("<<TreeviewOpen>>", self.on_open)
 
-        # --- инфо-панель: вкладки Summary / Tasks / Details ---
+        # --- инфо-панель: обычный текст; вкладки — только для run-level файла ---
         right = ttk.Frame(paned)
+        self._info_frame = ttk.Frame(right)
+        self.info = tk.Text(self._info_frame, wrap="none", state="disabled")
+        info_sb = ttk.Scrollbar(
+            self._info_frame, orient="vertical", command=self.info.yview
+        )
+        self.info.configure(yscrollcommand=info_sb.set)
+        self.info.grid(row=0, column=0, sticky="nsew")
+        info_sb.grid(row=0, column=1, sticky="ns")
+        self._info_frame.rowconfigure(0, weight=1)
+        self._info_frame.columnconfigure(0, weight=1)
+        self._info_frame.grid(row=0, column=0, sticky="nsew")
+
+        # Вкладки Summary/Tasks — только при выборе run-level файла.
         self.report = ReportTabs(right)
-        self.report.grid(row=0, column=0, columnspan=2, sticky="nsew")
+        self.report.grid(row=0, column=0, sticky="nsew")
+        self.report.grid_remove()
         right.rowconfigure(0, weight=1)
         right.columnconfigure(0, weight=1)
 
@@ -524,7 +539,7 @@ class W2DNavigatorApp:
         if path is not None:
             file_run = self._file_runs.get(iid) if iid else None
             if file_run is not None:
-                self._show_run_info(file_run)
+                self._show_run_report(file_run)
             else:
                 self._show_file_info(path)
         elif iid is not None and iid in self._missing:
@@ -532,11 +547,11 @@ class W2DNavigatorApp:
                 f"Task file missing:\n{self._task_files.get(iid)}"
             )
         elif run_id is not None:
-            self._show_run_info(run_id, detailed=False)
+            self._show_run_summary(run_id)
         elif iid is not None and iid in self._folders:
             # Папка ``tasks``: показываем сводку прогона, но выбором прогона
             # не считается (иначе производные узлы цеплялись бы к папке).
-            self._show_run_info(self._folders[iid], detailed=False)
+            self._show_run_summary(self._folders[iid])
         else:
             # Выбрана папка кейса или ничего — правая панель пуста.
             self._set_info("")
@@ -764,14 +779,18 @@ class W2DNavigatorApp:
         ):
             self._open_viewer(path)
 
-    def _show_run_info(self, run_id: str, *, detailed: bool = True) -> None:
-        """Вкладка ``Summary`` по прогону (артефакты, статусы, сборка).
+    def _show_run_summary(self, run_id: str) -> None:
+        """Короткая сводка по прогону в обычной текстовой панели (как раньше).
 
-        ``detailed=True`` — run-level файл: подробная сводка плюс вкладка
-        ``Tasks``. ``detailed=False`` (папка прогона) — короткая сводка без
-        таблицы задач. Сбор/форматирование вынесены в :mod:`src.wave2d.run_info`.
+        Показывается при выборе папки прогона/``tasks``: вкладок нет.
         """
-        self.report.show_run(collect_run_info(self.nav, run_id), detailed=detailed)
+        info = collect_run_info(self.nav, run_id)
+        self._set_info(format_run_info(info, detailed=False))
+
+    def _show_run_report(self, run_id: str) -> None:
+        """Вкладки ``Summary``/``Tasks`` — подробный отчёт по run-level файлу."""
+        self._show_report_panel()
+        self.report.show_run(collect_run_info(self.nav, run_id))
 
     def _show_file_info(self, path: Path) -> None:
         if not fsprobe.is_file(path):
@@ -809,5 +828,19 @@ class W2DNavigatorApp:
         return lines
 
     def _set_info(self, text: str) -> None:
-        """Пишет текст на вкладку ``Details`` (логи, сведения о файле)."""
-        self.report.show_details(text)
+        """Пишет текст в обычную инфо-панель (сводка прогона, логи, файл)."""
+        self._show_text_panel()
+        self.info.configure(state="normal")
+        self.info.delete("1.0", tk.END)
+        self.info.insert("1.0", text)
+        self.info.configure(state="disabled")
+
+    def _show_text_panel(self) -> None:
+        """Показывает обычный текстовый информационный блок."""
+        self.report.grid_remove()
+        self._info_frame.grid()
+
+    def _show_report_panel(self) -> None:
+        """Показывает вкладки отчёта (``Summary``/``Tasks``)."""
+        self._info_frame.grid_remove()
+        self.report.grid()
