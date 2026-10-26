@@ -37,8 +37,8 @@
       `kW`, `kW/cm^3`, `cm^3`, `1`; нет `units` → только имя).
 - [x] Комплексные 1D — **отдельный рендер-заглушка** `draw_1d_complex`
       (одна составляющая, слушает `real/imag/abs`); полноценные
-      `real/imag/abs` линиями + легенда — доработать в
-      [p0-multi-select-and-multi-curve-1d-dataset-view.md](../p0-multi-select-and-multi-curve-1d-dataset-view.md).
+      `real/imag/abs` линиями + легенда — доработано в
+      [2026-10-26-multi-select-and-multi-curve-1d-dataset-view.md](2026-10-26-multi-select-and-multi-curve-1d-dataset-view.md).
 - [x] `W2DViewer` передаёт оси при создании `DatasetView`. Проверено вручную на
       `/power_balance/nphi+122/p_ld` (вложенный) и `/power_balance/p_ld`
       (плоский, без `units`).
@@ -46,7 +46,7 @@
 ### F2 — несколько кривых
 
 Вынесено в отдельную задачу (меняет контракт `Selection`/`show`):
-[p0-multi-select-and-multi-curve-1d-dataset-view.md](../p0-multi-select-and-multi-curve-1d-dataset-view.md).
+[2026-10-26-multi-select-and-multi-curve-1d-dataset-view.md](2026-10-26-multi-select-and-multi-curve-1d-dataset-view.md).
 
 ## Критерии готовности
 

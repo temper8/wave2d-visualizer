@@ -4,7 +4,7 @@
 - **Статус:** todo
 - **Зависит от:** [p2-multiview-compare-runs.md](p2-multiview-compare-runs.md)
   (реестр и окно MultiView),
-  [p0-multi-select-and-multi-curve-1d-dataset-view.md](p0-multi-select-and-multi-curve-1d-dataset-view.md)
+  [done/2026-10-26-multi-select-and-multi-curve-1d-dataset-view.md](done/2026-10-26-multi-select-and-multi-curve-1d-dataset-view.md)
   (единообразие подписей/легенды)
 - **Файлы:** `src/wave2d/renderers.py`, `src/wave2d/multiview.py`,
   `src/wave2d/datasetview.py`
