@@ -231,12 +231,14 @@ class DatasetView(ttk.Frame):
         self._phi_label: ttk.Label | None = None
 
         # Две панели: полоидальная карта (широкая) и топ-вид тора (узкая).
-        # Топ-вид скрыт, пока не запрошен чекбоксом; ``constrained`` layout
-        # игнорирует невидимые оси и отдаёт всю ширину карте.
+        # Топ-вид скрыт, пока не запрошен чекбоксом; пока он скрыт, карта
+        # занимает обе колонки (см. :meth:`_set_toroidal`).
         self.fig = plt.figure(figsize=(6.5, 5.5), layout="constrained")
-        grid = self.fig.add_gridspec(1, 2, width_ratios=(3, 1))
-        self.ax = self.fig.add_subplot(grid[0, 0])
-        self.ax_tor = self.fig.add_subplot(grid[0, 1])
+        self._grid = self.fig.add_gridspec(1, 2, width_ratios=(3, 1))
+        # По умолчанию карта занимает обе колонки: пока топ-вид скрыт,
+        # constrained layout иначе оставлял бы справа пустую четверть.
+        self.ax = self.fig.add_subplot(self._grid[0, :])
+        self.ax_tor = self.fig.add_subplot(self._grid[0, 1])
         self.ax_tor.set_visible(False)
         # Больше воздуха по краям фигуры (w_pad/h_pad — в дюймах).
         self.fig.get_layout_engine().set(w_pad=0.12, h_pad=0.12)
@@ -853,6 +855,9 @@ class DatasetView(ttk.Frame):
                 ylabel=ylabel,
             )
         else:
+            # Топ-вид — до карты: он меняет раскладку осей, а цветовая шкала
+            # карты должна создаваться уже для суженной оси.
+            self._draw_toroidal(selection)
             self._colorbar = draw_2d(
                 self.ax, self.fig, sliced, title=title,
                 view=self.view_var.get(), R=self.R, Z=self.Z,
@@ -860,7 +865,6 @@ class DatasetView(ttk.Frame):
                 vmin=None if self._clim is None else self._clim[0],
                 vmax=None if self._clim is None else self._clim[1],
             )
-            self._draw_toroidal(selection)
 
     def _equator_toggled(self) -> None:
         """Пересобирает контролы после включения/выключения экватора.
@@ -891,14 +895,14 @@ class DatasetView(ttk.Frame):
         )
         if not ready:
             return
-        self.ax_tor.set_visible(True)
+        self._set_toroidal(True)
         self.ax_tor.clear()
         if self._draw_equatorial(selection):
             return
         # Фолбэк: схема-компас без данных (только для оси phi).
         values = selection.mode_values
         if selection.mode_name != "phi" or values is None or len(values) == 0:
-            self.ax_tor.set_visible(False)
+            self._set_toroidal(False)
             return
         index = min(max(int(self.mode_var.get()), 0), len(values) - 1)
         draw_toroidal_view(
@@ -1057,7 +1061,18 @@ class DatasetView(ttk.Frame):
                 pass
             self._toroidal_colorbar = None
         self.ax_tor.clear()
-        self.ax_tor.set_visible(False)
+        self._set_toroidal(False)
+
+    def _set_toroidal(self, visible: bool) -> None:
+        """Раскладка: одна карта на всю ширину или карта + топ-вид экватора.
+
+        Пока топ-вид скрыт, основная ось занимает обе колонки ``gridspec`` —
+        иначе ``constrained`` layout отдавал бы ей только 3/4 ширины и график
+        был бы смещён влево.
+        """
+        spec = self._grid[0, 0] if visible else self._grid[0, :]
+        self.ax.set_subplotspec(spec)
+        self.ax_tor.set_visible(visible)
 
     # --- 1D ---------------------------------------------------------------
 
