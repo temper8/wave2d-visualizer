@@ -33,6 +33,8 @@
 
 from __future__ import annotations
 
+import textwrap
+
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import Any
@@ -93,6 +95,11 @@ class Selection:
 class DatasetView(ttk.Frame):
     """Область данных: рендеринг выбранного узла в одном из режимов."""
 
+    #: Ширина переноса подписи прогона (символов) — держим в несколько строк.
+    _FOOTER_WRAP = 110
+    #: Максимум строк подписи; длиннее — обрезаем и ставим «…» в конце.
+    _FOOTER_MAX_LINES = 2
+
     def __init__(
         self,
         master,
@@ -103,12 +110,15 @@ class DatasetView(ttk.Frame):
         spectrum_an: dict[int, complex] | None = None,
         on_add_to_comparison: Callable[[Selection], None] | None = None,
         on_animate: Callable[[], None] | None = None,
+        run_footer: tuple[str | None, str | None] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(master, **kwargs)
         self.R: np.ndarray | None = None
         self._on_add_to_comparison = on_add_to_comparison
         self._on_animate = on_animate
+        #: Имя/описание прогона, рисуемые под фигурой (``supxlabel``).
+        self._run_footer: tuple[str | None, str | None] = run_footer or (None, None)
         self.Z: np.ndarray | None = None
         self.set_coords(coords)
         self.major_radius: np.ndarray | None = None
@@ -182,6 +192,14 @@ class DatasetView(ttk.Frame):
             # Вызвано после сборки — пересобираем переключатели под выбор.
             self.show(self._selection)
 
+    def set_run_footer(
+        self, name: str | None, description: str | None = None
+    ) -> None:
+        """Задаёт имя/описание прогона для подписи под фигурой (``None`` — убрать)."""
+        self._run_footer = (name, description)
+        if hasattr(self, "footer_var"):
+            self.redraw()
+
     def _build(self) -> None:
         """Создаёт панель управления, холст, атрибуты и toolbar.
 
@@ -196,6 +214,8 @@ class DatasetView(ttk.Frame):
         self.view_var = tk.StringVar(value="rz" if self.R is not None else "rho")
         self.comp_var = tk.StringVar(value="abs")
         self.axis_var = tk.StringVar(value="index")
+        #: Чекбокс «Footer»: показывать имя/описание прогона на картинке.
+        self.footer_var = tk.BooleanVar(value=True)
         self.mode_var = tk.IntVar(value=0)
         #: Слайдер тороидального угла (реконструкция одной моды ``nphi``).
         self.phi_var = tk.IntVar(value=0)
@@ -327,7 +347,30 @@ class DatasetView(ttk.Frame):
                 comp=self.comp_var.get(),
             )
 
+        self._apply_run_footer()
         self.canvas.draw_idle()
+
+    def _apply_run_footer(self) -> None:
+        """Рисует подпись ``<name>: <description>`` под фигурой (``supxlabel``).
+
+        Текст figure-level: имя и описание объединяются в одну строку
+        ``<name>: <description>``, затем переносятся по ширине
+        (:attr:`_FOOTER_WRAP`). Всего не больше :attr:`_FOOTER_MAX_LINES`
+        строк: если длиннее — хвост обрезается и ставится «…». Текст попадает
+        и на экран, и в сохранённый PNG, и в кадры анимации. При выключенном
+        чекбоксе «Footer» или пустых строках подпись снимается.
+        """
+        name, description = self._run_footer
+        if not self.footer_var.get() or not (name or description):
+            self.fig.supxlabel("")
+            return
+        parts = [str(part) for part in (name, description) if part]
+        text = ": ".join(parts)
+        lines = textwrap.wrap(text, width=self._FOOTER_WRAP) or [text]
+        if len(lines) > self._FOOTER_MAX_LINES:
+            lines = lines[: self._FOOTER_MAX_LINES]
+            lines[-1] = lines[-1][: self._FOOTER_WRAP - 1].rstrip() + "…"
+        self.fig.supxlabel("\n".join(lines), fontsize=9)
 
     def _line_selections(self) -> list[Selection]:
         """Выбранные 1D-датасеты (для наложения нескольких кривых)."""
@@ -386,6 +429,9 @@ class DatasetView(ttk.Frame):
                 self._add_comp_buttons()
         if mode in ("1d", "2d"):
             self._add_compare_button()
+        if mode in ("1d", "2d", "3d") and any(self._run_footer):
+            self._add_footer_toggle()
+
     def _add_view_buttons(self) -> None:
         """2D-вид ``(R,Z)/(rho,theta)``; ``(R,Z)`` — только если есть координаты."""
         options = [("rho", "(rho,theta)")]
@@ -467,6 +513,15 @@ class DatasetView(ttk.Frame):
         for selection in self._selections:
             if selection.data is not None:
                 self._on_add_to_comparison(selection)
+
+    def _add_footer_toggle(self) -> None:
+        """Чекбокс «Footer»: показывать имя/описание прогона на картинке."""
+        ttk.Checkbutton(
+            self.controls,
+            text="Footer",
+            variable=self.footer_var,
+            command=self.redraw,
+        ).pack(side=tk.RIGHT)
 
     # --- стек по модам (3D) ----------------------------------------------
 

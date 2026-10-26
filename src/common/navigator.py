@@ -156,6 +156,26 @@ class Wave2DNavigator(Navigator):
         base = self.case_dir(case_id)
         return base / stamp if stamp else base
 
+    def run_dir_of(self, path: str | Path) -> Path | None:
+        """Каталог прогона для произвольного файла внутри слоя Wave2D.
+
+        Путь разбирается относительно корня навигатора: ``<case>[/<stamp>]/...``.
+        Возвращает ``<root>/<case>`` (legacy-плоско) или ``<root>/<case>/<stamp>``;
+        ``None``, если путь вне корня (напр. производный артефакт в ``derived/``).
+        """
+        try:
+            rel = Path(path).resolve().relative_to(self.root.resolve())
+        except (ValueError, OSError):
+            return None
+        parts = rel.parts
+        if not parts:
+            return None
+        if len(parts) >= 2 and _STAMP_RE.match(parts[1]):
+            stamped = self.root / parts[0] / parts[1]
+            if stamped.is_dir():
+                return stamped
+        return self.root / parts[0]
+
     def results(self, run_id: str, name: str = "results.h5") -> Path:
         """Run-level файл прогона (напр. общий ``results.h5`` серии по ``nphi``)."""
         return self.run_dir(run_id) / name

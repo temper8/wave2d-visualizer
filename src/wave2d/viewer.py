@@ -27,10 +27,12 @@ from tkinter import messagebox, ttk
 
 from src.common.h5reader import H5Reader
 from src.common.navigator import default_navigator
+from src.common.paths import derived
 from src.common.shell import open_in_default_app
 from src.wave2d.datasetview import DatasetView, Selection
 from src.wave2d.h5tree import H5TreeView
 from src.wave2d.multiview import AddResult, PlotItem, add_to_comparison
+from src.wave2d.run_info import read_work_meta
 from src.wave2d.schema import (
     GEOMETRY_R,
     GRID_PSI,
@@ -161,9 +163,11 @@ class W2DViewer:
         self.tree_view = H5TreeView(paned, on_select=self.on_select)
         self.tree_view.populate(self.reader)
 
+        run_name, run_description = self._load_run_footer()
         self.dataset_view = DatasetView(
             paned,
             coords=self._load_coords(),
+            run_footer=(run_name, run_description),
             major_radius=self._load_major_radius(),
             spectrum_an=self._load_spectrum_an(),
             rho=self._load_axis(GRID_RHO),
@@ -174,6 +178,44 @@ class W2DViewer:
 
         paned.add(self.tree_view, weight=1)
         paned.add(self.dataset_view, weight=3)
+
+    def _load_run_footer(self) -> tuple[str | None, str | None]:
+        """Имя/описание прогона из ``input.toml`` (``[work]``) или ``(None, None)``.
+
+        Run-каталог определяется по пути файла через навигатор
+        (:meth:`Wave2DNavigator.run_dir_of`) — работает и для run-level файлов
+        (``results.h5``/``report.h5``), и для ``tasks/<задача>/results.h5``.
+        Для производных артефактов (``nphi_merged.h5``, ``total_fields.hdf5``)
+        прогон ищется по раскладке ``derived/runs/<case>/<stamp>/``. Если имени
+        в ``input.toml`` нет, подставляется ``<case>/<stamp>`` (как в
+        GUI-навигаторе); для файлов вне обоих корней подписи нет.
+        """
+        nav = default_navigator().wave2d
+        run_dir = nav.run_dir_of(self.file_path) or self._derived_run_dir()
+        if run_dir is None:
+            return None, None
+        name, description = read_work_meta(run_dir)
+        if not name:
+            try:
+                name = "/".join(run_dir.relative_to(nav.root).parts)
+            except (ValueError, OSError):
+                name = run_dir.name
+        return name, description
+
+    def _derived_run_dir(self) -> Path | None:
+        """Run-каталог источника для файла из ``derived/runs/<case>/<stamp>/``.
+
+        Производные артефакты (``nphi_merged.h5``, ``total_fields.hdf5``) лежат
+        вне корня Wave2D — их прогон ищем по раскладке :func:`run_derived`.
+        """
+        try:
+            rel = Path(self.file_path).resolve().relative_to(derived("runs").resolve())
+        except (ValueError, OSError):
+            return None
+        parts = rel.parts
+        if len(parts) < 3:
+            return None
+        return default_navigator().wave2d.run_dir(f"{parts[0]}/{parts[1]}")
 
     def _load_coords(self) -> tuple[np.ndarray, np.ndarray] | None:
         """Координаты (R,Z) для физического вида, если есть в файле."""
