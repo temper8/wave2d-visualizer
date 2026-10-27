@@ -28,6 +28,12 @@
 заданном числе точек по углу ``phi`` и пишет ``total_fields.hdf5`` рядом с
 merged-файлом; готовый файл открывается во viewer.
 
+Кнопка **«Delete»** контекстная: для узла производного артефакта
+(``nphi_merged.h5``, ``total_fields.hdf5``, папка ``animations`` или ролик)
+удаляет сам артефакт; для узла прогона — весь прогон (после подтверждения
+Yes/No); для прочих узлов (задачи, ``results.h5``) неактивна. Все кнопки
+действий прогона собраны в блоке ``Run actions``.
+
 Папка ``derived/runs/<case>/<stamp>/animations`` с роликами (их собирает
 viewer по кнопке Animate) появляется в дереве листом-папкой ``animations``;
 двойной клик по MP4 открывает его системным проигрывателем
@@ -45,6 +51,7 @@ viewer по кнопке Animate) появляется в дереве лист�
 from pathlib import Path
 
 import queue
+import shutil
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
@@ -121,6 +128,10 @@ class W2DNavigatorApp:
         self._missing: set[str] = set()
         # iid видео-файлов из папки ``animations`` -> путь к MP4.
         self._videos: dict[str, Path] = {}
+        # iid узла производного артефакта -> путь к удаляемому файлу/папке.
+        self._artifacts: dict[str, Path] = {}
+        # iid текущего выбранного узла (для контекстной кнопки Delete).
+        self._selected_iid: str | None = None
         self.selected: Path | None = None
         self.selected_video: Path | None = None
 
@@ -360,12 +371,19 @@ class W2DNavigatorApp:
             self.run_buttons.append(btn)
 
         self.open_btn = ttk.Button(
-            right, text="Open viewer", command=self.open_selected,
+            self.actions, text="Open viewer", command=self.open_selected,
             state="disabled",
         )
-        self.open_btn.grid(
-            row=3, column=0, columnspan=2, sticky="ew", pady=6, padx=_PANEL_PAD
+        self.open_btn.pack(side=tk.LEFT, padx=(6, 4), pady=6)
+
+        # Delete — контекстная: активна для узла артефакта или узла прогона
+        # (см. :meth:`_refresh_delete_button`). В :attr:`run_buttons` не входит,
+        # чтобы :meth:`_set_run_buttons` не включала её при любом выборе прогона.
+        self.delete_btn = ttk.Button(
+            self.actions, text="Delete", command=self.delete_selected,
+            state="disabled",
         )
+        self.delete_btn.pack(side=tk.LEFT, padx=(6, 4), pady=6)
 
         paned.add(left, weight=2)
         paned.add(right, weight=3)
@@ -483,7 +501,9 @@ class W2DNavigatorApp:
             merged_results(run_id),
             run_derived(run_id, "total_fields.hdf5"),
         ):
-            self._add_results_node(parent, path, run_id)
+            iid = self._add_results_node(parent, path, run_id)
+            if iid is not None:
+                self._artifacts[iid] = path
         self._add_animations_node(parent, run_id)
 
     def _add_animations_node(self, parent: str, run_id: str) -> None:
@@ -512,6 +532,7 @@ class W2DNavigatorApp:
         iid = f"animations::{parent}"
         self.tree.insert(parent, "end", iid=iid, text="animations", open=False)
         self._node_run[iid] = run_id
+        self._artifacts[iid] = anim_dir
         for video in videos:
             node = f"video::{video}"
             if node in self._videos:
@@ -519,6 +540,7 @@ class W2DNavigatorApp:
             self.tree.insert(iid, "end", iid=node, text=video.name)
             self._videos[node] = video
             self._node_run[node] = run_id
+            self._artifacts[node] = video
 
     def _add_tasks_folder(self, parent: str, run_id: str) -> None:
         """Добавляет узел-папку ``tasks`` с ленивыми детьми.
@@ -613,6 +635,8 @@ class W2DNavigatorApp:
         self._task_files.clear()
         self._missing.clear()
         self._videos.clear()
+        self._artifacts.clear()
+        self._selected_iid = None
         self.selected = None
         self.selected_video = None
         self.selected_run = None
@@ -628,6 +652,7 @@ class W2DNavigatorApp:
     def on_select(self, event=None) -> None:
         selection = self.tree.selection()
         iid = selection[0] if selection else None
+        self._selected_iid = iid
         if iid is not None:
             self._resolve_task(iid)
         self._update_run_header(self._node_run.get(iid) if iid else None)
@@ -745,6 +770,89 @@ class W2DNavigatorApp:
             and fsprobe.is_file(merged_results(run_id))
         )
         self.render_btn.configure(state="normal" if can_render else "disabled")
+        self._refresh_delete_button()
+
+    def _refresh_delete_button(self) -> None:
+        """Контекстная активация Delete: узел артефакта или узел прогона.
+
+        Артефакт (merged/``total_fields``/``animations``/ролик) — удаление
+        самого артефакта; узел прогона — удаление всего прогона. Прочие узлы
+        (задачи, ``results.h5``, run-level файлы) — научные данные, Delete
+        для них недоступна.
+        """
+        iid = self._selected_iid
+        if iid is not None and iid in self._artifacts:
+            self.delete_btn.configure(state="normal", text="Delete artifact")
+        elif iid is not None and iid in self._runs:
+            self.delete_btn.configure(state="normal", text="Delete run")
+        else:
+            self.delete_btn.configure(state="disabled", text="Delete")
+
+    def delete_selected(self) -> None:
+        """Удаляет выбранный артефакт либо (для узла прогона) весь прогон."""
+        iid = self._selected_iid
+        if iid is None:
+            return
+        artifact = self._artifacts.get(iid)
+        if artifact is not None:
+            self._delete_artifact(artifact)
+        elif iid in self._runs:
+            self._delete_run(self._runs[iid])
+
+    def _delete_artifact(self, path: Path) -> None:
+        """Удаляет производный артефакт (файл или папку) после подтверждения."""
+        if not (fsprobe.is_file(path) or fsprobe.is_dir(path)):
+            messagebox.showerror(
+                "Delete artifact", f"Not found:\n{path}", parent=self.root
+            )
+            return
+        if not messagebox.askyesno(
+            "Delete artifact",
+            f"Delete this artifact?\n\n{path}",
+            parent=self.root,
+        ):
+            return
+        try:
+            if fsprobe.is_dir(path):
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+        except OSError as e:
+            messagebox.showerror(
+                "Delete artifact", f"Could not delete:\n{path}\n\n{e}",
+                parent=self.root,
+            )
+            return
+        self.populate()
+
+    def _delete_run(self, run_id: str) -> None:
+        """Удаляет папку прогона целиком после подтверждения Yes/No.
+
+        Уничтожаются **все** данные прогона (``results.h5``, ``tasks/`` и пр.) —
+        операция необратима. Производные артефакты в ``derived/`` остаются:
+        при необходимости удаляйте их отдельно (выбор артефакта в дереве).
+        """
+        run_dir = self.nav.run_dir(run_id)
+        if not fsprobe.is_dir(run_dir):
+            messagebox.showerror(
+                "Delete run", f"Folder not found:\n{run_dir}", parent=self.root
+            )
+            return
+        if not messagebox.askyesno(
+            "Delete run",
+            f"Delete the whole run?\n\n{run_dir}\n\nThis cannot be undone.",
+            parent=self.root,
+        ):
+            return
+        try:
+            shutil.rmtree(run_dir)
+        except OSError as e:
+            messagebox.showerror(
+                "Delete run", f"Could not delete:\n{run_dir}\n\n{e}",
+                parent=self.root,
+            )
+            return
+        self.populate()
 
     def open_run_folder(self) -> None:
         """Открывает папку выбранного прогона в системном файловом менеджере."""
