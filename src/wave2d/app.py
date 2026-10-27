@@ -53,7 +53,7 @@ from src.common import fsprobe
 from src.common.h5reader import H5Reader
 from src.common.navigator import Wave2DNavigator, data_root
 from src.common.paths import merged_results, run_derived
-from src.common.shell import open_in_default_app
+from src.common.shell import open_folder, open_in_default_app
 from src.common.settings import (
     get_navigator_history,
     get_navigator_root,
@@ -88,8 +88,10 @@ _ICON_PATH = Path(__file__).resolve().parent / "assets" / "w2d_app_icon.png"
 #: Согласован с ``_PAD_X`` в :mod:`src.wave2d.runheader`.
 _PANEL_PAD = 4
 
-# Кнопки-заглушки панели действий с прогоном (команды появятся позже).
-# «Рендер полей» реализована отдельно — см. :meth:`W2DNavigatorApp.render_fields`.
+# Кнопки панели действий с прогоном. Реализована пока только «Open folder»
+# (открывает папку прогона в системном файловом менеджере, см.
+# :meth:`W2DNavigatorApp.open_run_folder`); «Spectrum» — заглушка без команды
+# и потому остаётся неактивной (см. :meth:`W2DNavigatorApp._set_run_buttons`).
 RUN_ACTIONS = ("Spectrum", "Open folder")
 
 class W2DNavigatorApp:
@@ -332,6 +334,11 @@ class W2DNavigatorApp:
             row=2, column=0, columnspan=2, sticky="ew", padx=_PANEL_PAD, pady=(6, 0)
         )
         self.run_buttons: list[ttk.Button] = []
+        # Текст кнопки -> команда (``None`` — заглушка без действия).
+        self._run_actions: dict[str, object] = {
+            "Spectrum": None,
+            "Open folder": self.open_run_folder,
+        }
         self.merge_btn = ttk.Button(
             self.actions, text="Merge (nphi)", command=self.merge_run,
             state="disabled",
@@ -343,7 +350,12 @@ class W2DNavigatorApp:
         )
         self.render_btn.pack(side=tk.LEFT, padx=(6, 4), pady=6)
         for text in RUN_ACTIONS:
-            btn = ttk.Button(self.actions, text=text, state="disabled")
+            btn = ttk.Button(
+                self.actions,
+                text=text,
+                state="disabled",
+                command=self._run_actions.get(text),
+            )
             btn.pack(side=tk.LEFT, padx=(6, 4), pady=6)
             self.run_buttons.append(btn)
 
@@ -701,10 +713,13 @@ class W2DNavigatorApp:
     # --- инфо-панель -----------------------------------------------------
 
     def _set_run_buttons(self, enabled: bool) -> None:
-        """Включает/гасит кнопки панели действий (активны для прогона)."""
-        state = "normal" if enabled else "disabled"
+        """Включает/гасит кнопки панели действий (активны для прогона).
+
+        Кнопки-заглушки без команды (``Spectrum``) остаются неактивными.
+        """
         for btn in self.run_buttons:
-            btn.configure(state=state)
+            has_cmd = self._run_actions.get(btn.cget("text")) is not None
+            btn.configure(state="normal" if (enabled and has_cmd) else "disabled")
 
     def _refresh_run_actions(self) -> None:
         """Синхронизирует панель действий с текущим выбором.
@@ -730,6 +745,24 @@ class W2DNavigatorApp:
             and fsprobe.is_file(merged_results(run_id))
         )
         self.render_btn.configure(state="normal" if can_render else "disabled")
+
+    def open_run_folder(self) -> None:
+        """Открывает папку выбранного прогона в системном файловом менеджере."""
+        run_id = self.selected_run
+        if run_id is None:
+            return
+        folder = self.nav.run_dir(run_id)
+        if not fsprobe.is_dir(folder):
+            messagebox.showerror(
+                "Open folder", f"Folder not found:\n{folder}", parent=self.root
+            )
+            return
+        try:
+            open_folder(folder)
+        except OSError as e:
+            messagebox.showerror(
+                "Open folder", f"Could not open:\n{folder}\n\n{e}", parent=self.root
+            )
 
     # --- слияние по nphi -------------------------------------------------
 
